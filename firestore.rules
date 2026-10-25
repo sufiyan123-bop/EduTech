@@ -26,6 +26,8 @@ service cloud.firestore {
   function verified() { return signedIn(); }
   function trialActive() { return verified() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('trialExpiresAt', timestamp.date(1970,1,1)) > request.time; }
   function enrolled(courseId) { return verified() && exists(/databases/$(database)/documents/enrollments/$(request.auth.uid + '_' + courseId)); }
+  function bundleAccess(courseId) { return verified() && exists(/databases/$(database)/documents/courses/$(courseId)) && get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', []).size() > 0 && enrolled(get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', [])[0]); }
+  function courseAccess(courseId) { return enrolled(courseId) || bundleAccess(courseId); }
   match /users/{id} {
    allow read: if signedIn() && (request.auth.uid == id || can("users.view"));
    allow create: if signedIn() && request.auth.uid == id && request.resource.data.keys().hasOnly(['name','email','phone','createdAt']) && request.resource.data.email == request.auth.token.email;
@@ -33,12 +35,12 @@ service cloud.firestore {
    allow delete: if can("users.delete");
   }
   match /courses/{id} {
-   allow read: if resource.data.published == true || can("courses.view") || enrolled(id);
+   allow read: if resource.data.published == true || can("courses.view") || courseAccess(id);
    allow create: if can("courses.create");
    allow update: if can("courses.edit");
    allow delete: if can("courses.delete");
    match /sections/{sectionId} {
-    allow read: if can("lectures.manage") || enrolled(id);
+    allow read: if can("lectures.manage") || courseAccess(id);
     allow create, update: if can("lectures.manage");
     allow delete: if can("lectures.delete");
    }
@@ -48,7 +50,7 @@ service cloud.firestore {
     allow delete: if can("lectures.delete");
    }
    match /lectures/{lectureId} {
-    allow read: if can("lectures.manage") || (verified() && (resource.data.get('freePreview',false) == true || enrolled(id) || (trialActive() && resource.data.get('trialEnabled',false) == true)));
+    allow read: if can("lectures.manage") || (verified() && (resource.data.get('freePreview',false) == true || courseAccess(id) || (trialActive() && resource.data.get('trialEnabled',false) == true)));
     allow create, update: if can("lectures.manage");
     allow delete: if can("lectures.delete");
    }
