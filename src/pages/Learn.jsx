@@ -1,3 +1,4 @@
+import { canWatchLecture } from "../utils/lectureAccess.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { collection, doc, getDoc, getDocs, query, where, setDoc, serverTimestamp } from "firebase/firestore";
@@ -40,15 +41,14 @@ export default function Learn(){
   if(!enrolled){enrolled=(courseDoc.data().includedInCourseIds||[]).some(parentId=>enrolledIds.has(parentId))}
   const profile=await getDoc(doc(db,"users",user.uid));const expiry=profile.data()?.trialExpiresAt;const expiryMs=expiry?.toMillis?.()||0;const trial=!enrolled&&expiryMs>Date.now();
   const catalog=await getDocs(collection(db,"courses",courseId,"lectureCatalog"));const items=catalog.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order??0)-(b.order??0)||a.title.localeCompare(b.title));
-  const available=courseDoc.data().published===true&&courseDoc.data().status!=="comingSoon";const first=items.find(l=>enrolled||(available&&((Number(courseDoc.data().price||0)===0&&l.freePreview===true)||(trial&&l.trialEnabled===true))));
+  const first=items.find(l=>canWatchLecture({course:courseDoc.data(),lecture:l,enrolled,trialActive:trial}));
   const progress={};if(enrolled||trial){const progressDocs=await Promise.all(items.map(l=>getDoc(doc(db,"lessonProgress",user.uid+"_"+courseId+"_"+l.id)).catch(()=>null)));progressDocs.forEach((d,i)=>{if(d?.exists()&&d.data().completed===true)progress[items[i].id]=true})}
   if(active){setHasAccess(enrolled);setIsTrial(trial);setTrialExpiresAt(expiryMs);setCourse({id:courseDoc.id,...courseDoc.data()});setLectures(items);setSelected(first?.id||"");setCompleted(progress)}
  }catch(e){if(active)setError(e.message||"Could not load your lessons. Check Firestore permissions.")}
  finally{if(active)setLoading(false)}})();return()=>{active=false}},[user,courseId,authLoading]);
  useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),15000);return()=>window.clearInterval(timer)},[]);
  const activeTrial=isTrial&&trialExpiresAt>now;
- const available=course?.published===true&&course?.status!=="comingSoon";
- const canPlay=l=>Boolean(l&&(hasAccess||(available&&((Number(course?.price||0)===0&&l.freePreview===true)||(activeTrial&&l.trialEnabled===true)))));
+ const canPlay=l=>canWatchLecture({course,lecture:l,enrolled:hasAccess,trialActive:activeTrial});
  const completeLesson=useCallback(id=>setCompleted(prev=>({...prev,[id]:true})),[]);
  useEffect(()=>{const l=lectures.find(x=>x.id===selected);setVideoId("");setVideoError("");if(!user||!selected||!canPlay(l))return;let active=true;getDoc(doc(db,"courses",courseId,"lectures",selected)).then(s=>{if(!active)return;const id=s.data()?.youtubeId||"";if(!/^[a-zA-Z0-9_-]{11}$/.test(id))setVideoError("This lesson has no valid YouTube video. Ask the administrator to check its URL.");else setVideoId(id)}).catch(e=>{if(active)setVideoError(e.code==="permission-denied"?"Video access denied. Ask the admin to publish latest Firestore rules and check your trial.":"Video could not load. Please try again.")});return()=>{active=false}},[user,selected,courseId,hasAccess,activeTrial,lectures,course]);
  if(authLoading||loading)return <div className="mx-auto max-w-5xl px-6 py-20 text-center">Loading your classroom…</div>;
