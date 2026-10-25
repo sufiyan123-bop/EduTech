@@ -4,6 +4,13 @@ service cloud.firestore {
   function signedIn() { return request.auth != null; }
   function owner() { return signedIn() && exists(/databases/$(database)/documents/system/adminOwner) && get(/databases/$(database)/documents/system/adminOwner).data.uid == request.auth.uid; }
   function admin() { return signedIn() && (request.auth.token.admin == true || owner()); }
+  function staffPermission(permission) { return signedIn() && exists(/databases/$(database)/documents/staff/$(request.auth.uid)) && get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('active',false) == true && get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('permissions',[]).hasAny([permission]); }
+  function can(permission) { return admin() || staffPermission(permission); }
+  match /staff/{id} {
+   allow get: if admin() || (signedIn() && request.auth.uid == id);
+   allow list: if admin();
+   allow create, update, delete: if admin();
+  }
   match /system/adminOwner {
    allow get: if signedIn() && (request.auth.token.email == 'sufiyankadival2@gmail.com' || admin());
    allow list: if false;
@@ -14,25 +21,29 @@ service cloud.firestore {
   function trialActive() { return verified() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('trialExpiresAt', timestamp.date(1970,1,1)) > request.time; }
   function enrolled(courseId) { return verified() && exists(/databases/$(database)/documents/enrollments/$(request.auth.uid + '_' + courseId)); }
   match /users/{id} {
-   allow read: if signedIn() && (request.auth.uid == id || admin());
+   allow read: if signedIn() && (request.auth.uid == id || can("users.view"));
    allow create: if signedIn() && request.auth.uid == id && request.resource.data.keys().hasOnly(['name','email','phone','createdAt']) && request.resource.data.email == request.auth.token.email;
-   allow update: if admin() || (signedIn() && request.auth.uid == id && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','phone','city','bio','photoURL']));
-   allow delete: if admin();
+   allow update: if can("users.edit") || (signedIn() && request.auth.uid == id && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','phone','city','bio','photoURL']));
+   allow delete: if can("users.delete");
   }
   match /courses/{id} {
-   allow read: if resource.data.published == true || admin();
-   allow write: if admin();
+   allow read: if resource.data.published == true || can("courses.view");
+   allow create: if can("courses.create");
+   allow update: if can("courses.edit");
+   allow delete: if can("courses.delete");
    match /sections/{sectionId} {
     allow read: if admin() || (resource.data.get('published',false) == true);
-    allow write: if admin();
+    allow create, update: if can("lectures.manage");
+    allow delete: if can("lectures.delete");
    }
    match /lectures/{lectureId} {
-    allow read: if admin() || (verified() && (resource.data.get('freePreview',false) == true || enrolled(id) || (trialActive() && resource.data.get('trialEnabled',false) == true)));
-    allow write: if admin();
+    allow read: if can("lectures.manage") || (verified() && (resource.data.get('freePreview',false) == true || enrolled(id) || (trialActive() && resource.data.get('trialEnabled',false) == true)));
+    allow create, update: if can("lectures.manage");
+    allow delete: if can("lectures.delete");
    }
   }
-  match /tracks/{id} { allow read: if true; allow write: if admin(); }
-  match /enrollments/{id} { allow read: if admin() || (signedIn() && resource.data.userId == request.auth.uid); allow write: if admin(); }
+  match /tracks/{id} { allow read: if true; allow create: if can("categories.create"); allow update: if can("categories.edit"); allow delete: if can("categories.delete"); }
+  match /enrollments/{id} { allow read: if can("enrollments.view") || (signedIn() && resource.data.userId == request.auth.uid); allow create: if can("enrollments.grant") && request.resource.data.userId is string && request.resource.data.courseId is string && id == request.resource.data.userId + "_" + request.resource.data.courseId; allow update: if can("enrollments.grant") && request.resource.data.userId == resource.data.userId && request.resource.data.courseId == resource.data.courseId; allow delete: if can("enrollments.revoke"); }
   match /{document=**} { allow read, write: if false; }
  }
 }
