@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../services/firebase";
+import { useSearchParams } from "react-router-dom";
 import { BookOpen, Clock3, Search, Sparkles, ArrowRight, CalendarDays } from "lucide-react";
 export default function Courses(){
+ const [searchParams]=useSearchParams();
  const [customTracks,setCustomTracks]=useState([]);const [courses,setCourses]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(""),[search,setSearch]=useState(""),[category,setCategory]=useState("All"),[availability,setAvailability]=useState("All");
  useEffect(()=>{let active=true;getDocs(query(collection(db,"courses"),where("published","==",true))).then(s=>{if(active)setCourses(s.docs.map(d=>({id:d.id,...d.data()})))}).catch(()=>{if(active)setError("Courses could not be loaded. Please try again later.")}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[]);
+ useEffect(()=>{const fromUrl=searchParams.get("track");if(fromUrl)setCategory(fromUrl)},[searchParams]);
  useEffect(()=>{getDocs(collection(db,"tracks")).then(s=>setCustomTracks(s.docs.map(d=>d.data().name).filter(Boolean))).catch(()=>{})},[]);
  const categories=useMemo(()=>["All",...new Set([...customTracks,...courses.map(c=>c.track).filter(Boolean)])], [courses,customTracks]);
  const visible=courses.filter(c=>((c.title||"")+" "+(c.description||"")+" "+(c.track||"")).toLowerCase().includes(search.toLowerCase())&&(category==="All"||c.track===category)&&(availability==="All"||availability==="Coming Soon"&&c.status==="comingSoon"||availability==="Available"&&c.status!=="comingSoon")).sort((a,b)=>Number(Boolean(b.featured))-Number(Boolean(a.featured)));
