@@ -40,12 +40,12 @@ export default function Learn(){
   if(!enrolled){const parentId=(courseDoc.data().includedInCourseIds||[])[0];if(parentId){const parentGrant=await getDoc(doc(db,"enrollments",user.uid+"_"+parentId));enrolled=parentGrant.exists()&&parentGrant.data().userId===user.uid&&parentGrant.data().courseId===parentId}}
   const profile=await getDoc(doc(db,"users",user.uid));const expiry=profile.data()?.trialExpiresAt;const trial=!enrolled&&Boolean(expiry?.toMillis&&expiry.toMillis()>Date.now());
   const catalog=await getDocs(collection(db,"courses",courseId,"lectureCatalog"));const items=catalog.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order??0)-(b.order??0)||a.title.localeCompare(b.title));
-  const first=items.find(l=>enrolled||l.freePreview===true||(trial&&l.trialEnabled===true));
+  const previewAllowed=Number(courseDoc.data().price||0)===0;const first=items.find(l=>enrolled||(previewAllowed&&(l.freePreview===true||(trial&&l.trialEnabled===true))));
   const progress={};if(enrolled){const progressDocs=await Promise.all(items.map(l=>getDoc(doc(db,"lessonProgress",user.uid+"_"+courseId+"_"+l.id)).catch(()=>null)));progressDocs.forEach((d,i)=>{if(d?.exists()&&d.data().completed===true)progress[items[i].id]=true})}
   if(active){setHasAccess(enrolled);setIsTrial(trial);setCourse({id:courseDoc.id,...courseDoc.data()});setLectures(items);setSelected(first?.id||"");setCompleted(progress)}
  }catch(e){if(active)setError(e.message||"Could not load your lessons. Check Firestore permissions.")}
  finally{if(active)setLoading(false)}})();return()=>{active=false}},[user,courseId,authLoading]);
- const canPlay=l=>Boolean(l&&(hasAccess||l.freePreview===true||(isTrial&&l.trialEnabled===true)));
+ const canPlay=l=>Boolean(l&&(hasAccess||(Number(course?.price||0)===0&&(l.freePreview===true||(isTrial&&l.trialEnabled===true)))));
  useEffect(()=>{const l=lectures.find(x=>x.id===selected);setVideoId("");if(!user||!selected||!canPlay(l))return;let active=true;getDoc(doc(db,"courses",courseId,"lectures",selected)).then(s=>{if(active)setVideoId(s.data()?.youtubeId||"")}).catch(()=>{});return()=>{active=false}},[user,selected,courseId,hasAccess,isTrial,lectures]);
  if(authLoading||loading)return <div className="mx-auto max-w-5xl px-6 py-20 text-center">Loading your classroom…</div>;
  if(!user)return <div className="mx-auto max-w-4xl px-6 py-20"><h1 className="text-3xl font-bold">Sign in to learn</h1><Link to="/login" className="mt-5 inline-block rounded-xl bg-blue-700 px-6 py-3 font-bold text-white">Sign in</Link></div>;
