@@ -8,9 +8,10 @@ export default function Learn(){
  const {courseId}=useParams();const {user,loading:authLoading}=useAuth();
  const [isTrial,setIsTrial]=useState(false);const [hasAccess,setHasAccess]=useState(false);const [videoId,setVideoId]=useState("");const [course,setCourse]=useState(null),[lectures,setLectures]=useState([]),[selected,setSelected]=useState(""),[loading,setLoading]=useState(true),[error,setError]=useState("");
  useEffect(()=>{if(authLoading)return;let active=true;if(!user){setLoading(false);return}setLoading(true);(async()=>{try{
- const grant=await getDoc(doc(db,"enrollments",user.uid+"_"+courseId));const enrolled=grant.exists()&&grant.data().userId===user.uid&&grant.data().courseId===courseId;
- const profile=await getDoc(doc(db,"users",user.uid));const expiry=profile.data()?.trialExpiresAt;const trial=!enrolled&&Boolean(expiry?.toMillis&&expiry.toMillis()>Date.now());
- const courseDoc=await getDoc(doc(db,"courses",courseId));if(!courseDoc.exists())throw Error("Course not found.");
+ const grant=await getDoc(doc(db,"enrollments",user.uid+"_"+courseId));let enrolled=grant.exists()&&grant.data().userId===user.uid&&grant.data().courseId===courseId;
+ const profile=await getDoc(doc(db,"users",user.uid));const expiry=profile.data()?.trialExpiresAt;let trial=!enrolled&&Boolean(expiry?.toMillis&&expiry.toMillis()>Date.now());
+ const courseDoc=await getDoc(doc(db,"courses",courseId));if(!courseDoc.exists())throw Error("Course not found.");if(!enrolled){const parentId=(courseDoc.data().includedInCourseIds||[])[0];if(parentId){const parentGrant=await getDoc(doc(db,"enrollments",user.uid+"_"+parentId));enrolled=parentGrant.exists()&&parentGrant.data().userId===user.uid&&parentGrant.data().courseId===parentId;}}
+ trial=trial&&!enrolled;
  const catalog=await getDocs(collection(db,"courses",courseId,"lectureCatalog"));const items=catalog.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order??0)-(b.order??0)||a.title.localeCompare(b.title));
  const first=items.find(l=>enrolled||l.freePreview===true||(trial&&l.trialEnabled===true));
 
