@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { createUserWithEmailAndPassword, sendEmailVerification, updateProfile, signOut } from "firebase/auth";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../services/firebase";
 export default function Signup(){
@@ -15,9 +15,7 @@ export default function Signup(){
    const credential=await createUserWithEmailAndPassword(auth,form.email.trim(),form.password);
    await updateProfile(credential.user,{displayName:form.name.trim()});
    await setDoc(doc(db,"users",credential.user.uid),{name:form.name.trim(),email:credential.user.email,phone:form.phone.trim(),createdAt:serverTimestamp()});
-   await sendEmailVerification(credential.user);
-   await signOut(auth);
-   setMessage("Account created! Check your inbox and spam folder to verify your email. Then sign in.");
+   setMessage("Your account is ready. You can now browse available courses.");
   }catch(err){setError(err.code==="auth/email-already-in-use"?"This email already has an account. Please sign in.":err.message)}
   finally{setBusy(false)}
  }
