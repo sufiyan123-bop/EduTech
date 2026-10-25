@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { collection, doc, getDoc, getDocs, setDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../services/firebase.js";
 import { useAuth } from "../services/AuthProvider.jsx";
 import { PlayCircle, ArrowLeft, ArrowRight, ChevronLeft, CheckCircle2, LockKeyhole, BookOpen } from "lucide-react";
@@ -35,9 +35,9 @@ export default function Learn(){
  const {courseId}=useParams(),{user,loading:authLoading}=useAuth();
  const [isTrial,setIsTrial]=useState(false),[trialExpiresAt,setTrialExpiresAt]=useState(0),[now,setNow]=useState(Date.now()),[videoError,setVideoError]=useState(""),[hasAccess,setHasAccess]=useState(false),[videoId,setVideoId]=useState(""),[course,setCourse]=useState(null),[lectures,setLectures]=useState([]),[selected,setSelected]=useState(""),[completed,setCompleted]=useState({}),[loading,setLoading]=useState(true),[error,setError]=useState("");
  useEffect(()=>{if(authLoading)return;let active=true;if(!user){setLoading(false);return}setLoading(true);setError("");(async()=>{try{
-  const grant=await getDoc(doc(db,"enrollments",user.uid+"_"+courseId));let enrolled=grant.exists()&&grant.data().userId===user.uid&&grant.data().courseId===courseId;
+  const grants=await getDocs(query(collection(db,"enrollments"),where("userId","==",user.uid)));const enrolledIds=new Set(grants.docs.filter(d=>d.id===user.uid+"_"+d.data().courseId).map(d=>d.data().courseId));let enrolled=enrolledIds.has(courseId);
   const courseDoc=await getDoc(doc(db,"courses",courseId));if(!courseDoc.exists())throw Error("Course not found.");
-  if(!enrolled){const parentId=(courseDoc.data().includedInCourseIds||[])[0];if(parentId){const parentGrant=await getDoc(doc(db,"enrollments",user.uid+"_"+parentId));enrolled=parentGrant.exists()&&parentGrant.data().userId===user.uid&&parentGrant.data().courseId===parentId}}
+  if(!enrolled){enrolled=(courseDoc.data().includedInCourseIds||[]).some(parentId=>enrolledIds.has(parentId))}
   const profile=await getDoc(doc(db,"users",user.uid));const expiry=profile.data()?.trialExpiresAt;const expiryMs=expiry?.toMillis?.()||0;const trial=!enrolled&&expiryMs>Date.now();
   const catalog=await getDocs(collection(db,"courses",courseId,"lectureCatalog"));const items=catalog.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order??0)-(b.order??0)||a.title.localeCompare(b.title));
   const available=courseDoc.data().published===true&&courseDoc.data().status!=="comingSoon";const first=items.find(l=>enrolled||(available&&((Number(courseDoc.data().price||0)===0&&l.freePreview===true)||(trial&&l.trialEnabled===true))));
