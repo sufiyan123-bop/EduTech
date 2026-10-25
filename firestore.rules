@@ -51,7 +51,7 @@ service cloud.firestore {
     allow delete: if can("lectures.delete");
    }
    match /lectureCatalog/{lectureId} {
-    allow read: if signedIn() || can("lectures.manage");
+    allow read: if publicAvailableCourse(id) || courseAccess(id) || can("lectures.manage");
     allow create, update: if can("lectures.manage");
     allow delete: if can("lectures.delete");
    }
