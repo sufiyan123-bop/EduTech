@@ -1,6 +1,6 @@
 import CourseThumbnail from "./components/CourseThumbnail.jsx";
 import { useEffect, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "./services/firebase.js";
 import { Link, Route, Routes } from "react-router-dom";
 import { BookOpen, Cloud, Code2, ShieldCheck, BrainCircuit, ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
@@ -20,7 +20,7 @@ import { Navigate } from "react-router-dom";
 
 function Home(){
  const [courses,setCourses]=useState([]),[loadingCourses,setLoadingCourses]=useState(true);
- useEffect(()=>{let active=true;getDocs(collection(db,"courses")).then(s=>{if(active)setCourses(s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.published===true))}).catch(()=>{}).finally(()=>{if(active)setLoadingCourses(false)});return()=>{active=false}},[]);
+ useEffect(()=>{let active=true;getDocs(query(collection(db,"courses"),where("published","==",true))).then(s=>{if(active)setCourses(s.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.published===true))}).catch(()=>{}).finally(()=>{if(active)setLoadingCourses(false)});return()=>{active=false}},[]);
  const featured=courses.filter(c=>c.featured===true&&!(c.includedInCourseIds||[]).length).sort((a,b)=>(a.homeOrder??999)-(b.homeOrder??999)).slice(0,3);
  return <div className="overflow-hidden bg-slate-50">
  <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-blue-800 text-white"><div className="pointer-events-none absolute -right-24 top-0 h-96 w-96 rounded-full bg-sky-400/10 blur-3xl"/><div className="relative mx-auto max-w-6xl px-5 py-16 sm:px-6 sm:py-24 lg:py-28"><p className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-2 text-[10px] font-bold tracking-widest text-sky-200 sm:text-xs"><Sparkles size={15}/> LEARN TODAY. LEAD TOMORROW.</p><motion.h1 initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} className="max-w-3xl text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl lg:text-7xl">Build real skills. <span className="text-sky-300">Unlock your future.</span></motion.h1><p className="mt-5 max-w-xl text-base leading-7 text-slate-200 sm:text-lg">Practical tech courses, structured lessons and career-focused learning — all in one place.</p><div className="mt-8 flex flex-wrap gap-3"><a href="#career-tracks" className="inline-flex items-center gap-2 rounded-xl bg-sky-400 px-5 py-3 text-sm font-extrabold text-slate-950 shadow-lg transition hover:bg-sky-300 sm:px-7 sm:py-4">Explore courses <ArrowRight size={18}/></a><Link to="/courses" className="inline-flex items-center gap-2 rounded-xl border border-white/30 px-5 py-3 text-sm font-bold text-white transition hover:bg-white/10 sm:px-7 sm:py-4">All courses</Link></div><div className="mt-9 flex flex-wrap gap-x-5 gap-y-3 text-xs font-medium text-blue-100 sm:text-sm"><span>✓ Practical video lessons</span><span>✓ Learn at your pace</span><span>✓ Career-focused paths</span></div></div></section>
