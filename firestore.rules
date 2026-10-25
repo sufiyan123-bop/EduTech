@@ -1,11 +1,31 @@
-rules_version = "2";
+rules_version = '2';
 service cloud.firestore {
  match /databases/{database}/documents {
   function signedIn() { return request.auth != null; }
   function admin() { return signedIn() && request.auth.token.admin == true; }
-  match /courses/{id} { allow read: if resource.data.published == true || admin(); allow write: if admin(); }
+  function verified() { return signedIn() && request.auth.token.email_verified == true; }
+  function trialActive() { return verified() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('trialExpiresAt', timestamp.date(1970,1,1)) > request.time; }
+  function enrolled(courseId) { return verified() && exists(/databases/$(database)/documents/enrollments/$(request.auth.uid + '_' + courseId)); }
+  match /users/{id} {
+   allow read: if signedIn() && (request.auth.uid == id || admin());
+   allow create: if signedIn() && request.auth.uid == id && request.resource.data.keys().hasOnly(['name','email','phone','createdAt']) && request.resource.data.email == request.auth.token.email;
+   allow update: if admin() || (signedIn() && request.auth.uid == id && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','phone','city','bio','photoURL']));
+   allow delete: if admin();
+  }
+  match /courses/{id} {
+   allow read: if resource.data.published == true || admin();
+   allow write: if admin();
+   match /sections/{sectionId} {
+    allow read: if admin() || (resource.data.get('published',false) == true);
+    allow write: if admin();
+   }
+   match /lectures/{lectureId} {
+    allow read: if admin() || (verified() && (resource.data.get('freePreview',false) == true || enrolled(id) || (trialActive() && resource.data.get('trialEnabled',false) == true)));
+    allow write: if admin();
+   }
+  }
   match /tracks/{id} { allow read: if true; allow write: if admin(); }
-  match /users/{id} { allow read: if signedIn() && (request.auth.uid == id || admin()); allow create: if signedIn() && request.auth.uid == id && request.resource.data.keys().hasOnly(["name","email","phone","createdAt"]); allow update: if signedIn() && request.auth.uid == id && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["name","phone","city","bio","photoURL"]); allow delete: if admin(); }
+  match /enrollments/{id} { allow read: if admin() || (signedIn() && resource.data.userId == request.auth.uid); allow write: if admin(); }
   match /{document=**} { allow read, write: if false; }
  }
 }
