@@ -50,7 +50,7 @@ service cloud.firestore {
     allow delete: if can("lectures.delete");
    }
    match /lectures/{lectureId} {
-    allow read: if can("lectures.manage") || (verified() && (resource.data.get('freePreview',false) == true || courseAccess(id) || (trialActive() && resource.data.get('trialEnabled',false) == true)));
+    allow read: if can("lectures.manage") || (verified() && (courseAccess(id) || (get(/databases/$(database)/documents/courses/$(id)).data.get('price', 0) == 0 && (resource.data.get('freePreview',false) == true || (trialActive() && resource.data.get('trialEnabled',false) == true)))));
     allow create, update: if can("lectures.manage");
     allow delete: if can("lectures.delete");
    }
