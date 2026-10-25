@@ -25,6 +25,12 @@ service cloud.firestore {
   }
   function verified() { return signedIn(); }
   function trialActive() { return verified() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('trialExpiresAt', timestamp.date(1970,1,1)) > request.time; }
+  function publicAvailableCourse(courseId) {
+   return exists(/databases/$(database)/documents/courses/$(courseId)) && get(/databases/$(database)/documents/courses/$(courseId)).data.get('published', false) == true && get(/databases/$(database)/documents/courses/$(courseId)).data.get('status', 'available') != 'comingSoon';
+  }
+  function trialLessonAccess(courseId, lectureId) {
+   return trialActive() && publicAvailableCourse(courseId) && exists(/databases/$(database)/documents/courses/$(courseId)/lectures/$(lectureId)) && get(/databases/$(database)/documents/courses/$(courseId)/lectures/$(lectureId)).data.get('trialEnabled',false) == true;
+  }
   function enrolled(courseId) { return verified() && exists(/databases/$(database)/documents/enrollments/$(request.auth.uid + '_' + courseId)); }
   function bundleAccess(courseId) { return verified() && exists(/databases/$(database)/documents/courses/$(courseId)) && get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', []).size() > 0 && enrolled(get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', [])[0]); }
   function courseAccess(courseId) { return enrolled(courseId) || bundleAccess(courseId); }
@@ -50,15 +56,15 @@ service cloud.firestore {
     allow delete: if can("lectures.delete");
    }
    match /lectures/{lectureId} {
-    allow read: if can("lectures.manage") || (verified() && (courseAccess(id) || (get(/databases/$(database)/documents/courses/$(id)).data.get('price', 0) == 0 && (resource.data.get('freePreview',false) == true || (trialActive() && resource.data.get('trialEnabled',false) == true)))));
+    allow read: if can("lectures.manage") || (verified() && (courseAccess(id) || (publicAvailableCourse(id) && ((get(/databases/$(database)/documents/courses/$(id)).data.get('price', 0) == 0 && resource.data.get('freePreview',false) == true) || (trialActive() && resource.data.get('trialEnabled',false) == true)))));
     allow create, update: if can("lectures.manage");
     allow delete: if can("lectures.delete");
    }
   }
   match /lessonProgress/{id} {
    allow read: if signedIn() && (resource.data.userId == request.auth.uid || can("enrollments.view"));
-   allow create: if signedIn() && request.resource.data.userId == request.auth.uid && request.resource.data.courseId is string && request.resource.data.lectureId is string && id == request.auth.uid + "_" + request.resource.data.courseId + "_" + request.resource.data.lectureId && request.resource.data.completed == true && request.resource.data.watchedSeconds is number && request.resource.data.watchedSeconds >= 0 && request.resource.data.duration is number && request.resource.data.duration > 0 && request.resource.data.watchedSeconds >= request.resource.data.duration * 0.9 && courseAccess(request.resource.data.courseId);
-   allow update: if signedIn() && resource.data.userId == request.auth.uid && request.resource.data.userId == resource.data.userId && request.resource.data.courseId == resource.data.courseId && request.resource.data.lectureId == resource.data.lectureId && request.resource.data.completed == true && request.resource.data.watchedSeconds is number && request.resource.data.duration is number && request.resource.data.duration > 0 && request.resource.data.watchedSeconds >= request.resource.data.duration * 0.9 && courseAccess(resource.data.courseId);
+   allow create: if signedIn() && request.resource.data.userId == request.auth.uid && request.resource.data.courseId is string && request.resource.data.lectureId is string && id == request.auth.uid + "_" + request.resource.data.courseId + "_" + request.resource.data.lectureId && request.resource.data.completed == true && request.resource.data.watchedSeconds is number && request.resource.data.watchedSeconds >= 0 && request.resource.data.duration is number && request.resource.data.duration > 0 && request.resource.data.watchedSeconds >= request.resource.data.duration * 0.9 && (courseAccess(request.resource.data.courseId) || trialLessonAccess(request.resource.data.courseId, request.resource.data.lectureId));
+   allow update: if signedIn() && resource.data.userId == request.auth.uid && request.resource.data.userId == resource.data.userId && request.resource.data.courseId == resource.data.courseId && request.resource.data.lectureId == resource.data.lectureId && request.resource.data.completed == true && request.resource.data.watchedSeconds is number && request.resource.data.duration is number && request.resource.data.duration > 0 && request.resource.data.watchedSeconds >= request.resource.data.duration * 0.9 && (courseAccess(resource.data.courseId) || trialLessonAccess(resource.data.courseId, resource.data.lectureId));
    allow delete: if false;
   }
   match /tracks/{id} { allow read: if true; allow create: if can("categories.create"); allow update: if can("categories.edit"); allow delete: if can("categories.delete"); }
