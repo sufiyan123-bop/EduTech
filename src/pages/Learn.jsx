@@ -20,7 +20,7 @@ function VideoPlayer({videoId,lectureId,courseId,userId,onComplete,saveProgress}
  const target=useRef(null),player=useRef(null),last=useRef(null),watched=useRef(0),saved=useRef(false);const [playerError,setPlayerError]=useState("");
  useEffect(()=>{let active=true,interval;watched.current=0;last.current=null;saved.current=false;setPlayerError("");
  loadYouTubeApi().then(YT=>{if(!active||!target.current)return;
-  player.current=new YT.Player(target.current,{videoId,playerVars:{rel:0,playsinline:1,modestbranding:1,origin:window.location.origin},events:{onStateChange:e=>{if(e.data!==YT.PlayerState.PLAYING)last.current=null},onError:()=>{if(active)setPlayerError("This video cannot play inside the site. Check YouTube embed permissions.")}}});
+  player.current=new YT.Player(target.current,{videoId,host:"https://www.youtube-nocookie.com",playerVars:{rel:0,playsinline:1,origin:window.location.origin},events:{onStateChange:e=>{if(e.data!==YT.PlayerState.PLAYING)last.current=null},onError:()=>{if(active)setPlayerError("This video cannot play inside the site. Check YouTube embed permissions.")}}});
   interval=window.setInterval(async()=>{const p=player.current;if(!p||typeof p.getPlayerState!=="function")return;
    try{const duration=p.getDuration(),current=p.getCurrentTime(),state=p.getPlayerState();
     if(state===YT.PlayerState.PLAYING&&duration>0){if(last.current!==null){const delta=current-last.current;if(delta>0&&delta<=2.5)watched.current+=delta}last.current=current}else last.current=null;
