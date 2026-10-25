@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
-import { collection, doc, getDocs, setDoc, deleteDoc, updateDoc, addDoc } from "firebase/firestore";
+import { collection, doc, getDocs, setDoc, deleteDoc, updateDoc, addDoc, writeBatch, getDoc } from "firebase/firestore";
 import { db } from "../services/firebase.js";
 import { Shield, Users, FolderPlus, Trash2 } from "lucide-react";
 export const PERMISSIONS=[
  ["courses.view","View all courses"],["courses.create","Create courses"],["courses.edit","Edit courses"],["courses.delete","Delete courses"],["lectures.manage","Add/edit lectures"],["lectures.delete","Delete lectures"],["categories.create","Add categories"],["categories.edit","Edit categories"],["categories.delete","Delete categories"],["users.view","View users"],["users.edit","Edit user profiles"],["users.delete","Delete user profiles"],["enrollments.view","View enrollments"],["enrollments.grant","Grant courses"],["enrollments.revoke","Revoke courses"]
 ];
 const PRESETS={"Course Creator":["courses.view","courses.create","lectures.manage"],"Course Editor":["courses.view","courses.create","courses.edit","lectures.manage"],"Student Support":["users.view","enrollments.view","enrollments.grant"],"Content Manager":["courses.view","courses.create","courses.edit","lectures.manage","categories.create","categories.edit"]};
+export const DEFAULT_CATEGORIES=["Programming","DevOps","Cybersecurity","Cloud Computing","AI & Data Science"];
 export function CategoryManager({permissions,owner,onChanged}){const [items,setItems]=useState([]),[name,setName]=useState(""),[editingId,setEditingId]=useState(""),[editingName,setEditingName]=useState(""),[error,setError]=useState(""),[notice,setNotice]=useState("");const can=p=>owner||permissions.includes(p);
  async function load(){try{const s=await getDocs(collection(db,"tracks"));setItems(s.docs.map(x=>({id:x.id,...x.data()})))}catch{setError("Unable to load categories.")}}
- useEffect(()=>{load()},[]);
+ async function initializeDefaults(){if(!owner)return;try{const marker=doc(db,"system","categoryDefaultsInitialized");const current=await getDoc(marker);if(current.exists())return;const existing=await getDocs(collection(db,"tracks"));const names=new Set(existing.docs.map(d=>d.data().name?.toLowerCase()));const batch=writeBatch(db);for(const name of DEFAULT_CATEGORIES){if(!names.has(name.toLowerCase()))batch.set(doc(collection(db,"tracks")),{name,createdAt:new Date().toISOString(),isDefault:true})}batch.set(marker,{initializedAt:new Date().toISOString()});await batch.commit();await load();onChanged?.()}catch(e){setError("Could not initialize default categories. Publish the latest Firestore rules, then refresh.")}}
+
+ useEffect(()=>{load().then(()=>initializeDefaults())},[]);
  async function create(e){e.preventDefault();setError("");try{const title=name.trim();if(!title||items.some(x=>x.name?.toLowerCase()===title.toLowerCase()))throw Error("Enter a unique category name.");await addDoc(collection(db,"tracks"),{name:title,createdAt:new Date().toISOString()});setName("");setNotice("Category added.");await load();onChanged?.()}catch(e){setError(e.message)}}
  async function rename(x){const title=editingName.trim();setError("");if(!title||items.some(y=>y.id!==x.id&&y.name?.toLowerCase()===title.toLowerCase()))return setError("Enter a unique category name.");try{await updateDoc(doc(db,"tracks",x.id),{name:title});setEditingId("");setEditingName("");setNotice("Category renamed. Existing courses keep their previous category until you edit them.");await load();onChanged?.()}catch{setError("Unable to rename category.")}}
  async function remove(x){if(!window.confirm("Delete category '"+x.name+"'? Existing courses will keep this category label until edited."))return;try{await deleteDoc(doc(db,"tracks",x.id));setNotice("Category deleted. Existing course category labels are unchanged.");await load();onChanged?.()}catch{setError("Unable to remove category.")}}
