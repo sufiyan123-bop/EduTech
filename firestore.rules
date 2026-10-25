@@ -55,6 +55,12 @@ service cloud.firestore {
     allow delete: if can("lectures.delete");
    }
   }
+  match /lessonProgress/{id} {
+   allow read: if signedIn() && (resource.data.userId == request.auth.uid || can("enrollments.view"));
+   allow create: if signedIn() && request.resource.data.userId == request.auth.uid && request.resource.data.courseId is string && request.resource.data.lectureId is string && id == request.auth.uid + "_" + request.resource.data.courseId + "_" + request.resource.data.lectureId && request.resource.data.completed == true && request.resource.data.watchedSeconds is number && request.resource.data.watchedSeconds >= 0 && request.resource.data.duration is number && request.resource.data.duration > 0 && request.resource.data.watchedSeconds >= request.resource.data.duration * 0.9 && courseAccess(request.resource.data.courseId);
+   allow update: if signedIn() && resource.data.userId == request.auth.uid && request.resource.data.userId == resource.data.userId && request.resource.data.courseId == resource.data.courseId && request.resource.data.lectureId == resource.data.lectureId && request.resource.data.completed == true && request.resource.data.watchedSeconds is number && request.resource.data.duration is number && request.resource.data.duration > 0 && request.resource.data.watchedSeconds >= request.resource.data.duration * 0.9 && courseAccess(resource.data.courseId);
+   allow delete: if false;
+  }
   match /tracks/{id} { allow read: if true; allow create: if can("categories.create"); allow update: if can("categories.edit"); allow delete: if can("categories.delete"); }
   match /enrollments/{id} { allow read: if can("enrollments.view") || (signedIn() && resource.data.userId == request.auth.uid); allow create: if can("enrollments.grant") && request.resource.data.userId is string && request.resource.data.courseId is string && id == request.resource.data.userId + "_" + request.resource.data.courseId; allow update: if can("enrollments.grant") && request.resource.data.userId == resource.data.userId && request.resource.data.courseId == resource.data.courseId; allow delete: if can("enrollments.revoke"); }
   match /{document=**} { allow read, write: if false; }
