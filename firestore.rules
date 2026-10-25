@@ -6,6 +6,12 @@ service cloud.firestore {
   function admin() { return signedIn() && (request.auth.token.admin == true || owner()); }
   function staffPermission(permission) { return signedIn() && exists(/databases/$(database)/documents/staff/$(request.auth.uid)) && get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('active',false) == true && get(/databases/$(database)/documents/staff/$(request.auth.uid)).data.get('permissions',[]).hasAny([permission]); }
   function can(permission) { return admin() || staffPermission(permission); }
+  match /system/categoryDefaultsInitialized {
+   allow get: if admin();
+   allow list: if false;
+   allow create: if admin() && !exists(/databases/$(database)/documents/system/categoryDefaultsInitialized);
+   allow update, delete: if false;
+  }
   match /staff/{id} {
    allow get: if admin() || (signedIn() && request.auth.uid == id);
    allow list: if admin();
