@@ -29,20 +29,24 @@ service cloud.firestore {
    return exists(/databases/$(database)/documents/courses/$(courseId)) && get(/databases/$(database)/documents/courses/$(courseId)).data.get('published', false) == true && get(/databases/$(database)/documents/courses/$(courseId)).data.get('status', 'available') != 'comingSoon';
   }
   function trialLessonAccess(courseId, lectureId) {
-   return trialActive() && publicAvailableCourse(courseId) && exists(/databases/$(database)/documents/courses/$(courseId)/lectures/$(lectureId)) && get(/databases/$(database)/documents/courses/$(courseId)/lectures/$(lectureId)).data.get('trialEnabled',false) == true;
+   return trialActive() && (publicAvailableCourse(courseId) || publicBundleFolder(courseId)) && exists(/databases/$(database)/documents/courses/$(courseId)/lectures/$(lectureId)) && get(/databases/$(database)/documents/courses/$(courseId)/lectures/$(lectureId)).data.get('trialEnabled',false) == true;
   }
   function enrolled(courseId) { return verified() && exists(/databases/$(database)/documents/enrollments/$(request.auth.uid + '_' + courseId)); }
   function bundleAccess(courseId) { return verified() && exists(/databases/$(database)/documents/courses/$(courseId)) && get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', []).size() > 0 && enrolled(get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', [])[0]); }
   function courseAccess(courseId) { return enrolled(courseId) || bundleAccess(courseId); }
   // Public metadata for an unpublished folder belonging to a published bundle.
   // The private /lectures documents remain enrollment- or trial-protected.
+  function bundleParentId(courseId) {
+   return get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', [])[0];
+  }
+  // Only course metadata and lecture titles are public; video IDs stay protected.
   function publicBundleFolder(courseId) {
    return exists(/databases/$(database)/documents/courses/$(courseId))
     && get(/databases/$(database)/documents/courses/$(courseId)).data.get('folderOnly', false) == true
     && get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', []).size() > 0
-    && exists(/databases/$(database)/documents/courses/$(get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', [])[0]))
-    && get(/databases/$(database)/documents/courses/$(get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', [])[0])).data.get('published', false) == true
-    && get(/databases/$(database)/documents/courses/$(get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', [])[0])).data.get('includedCourseIds', []).hasAny([courseId]);
+    && exists(/databases/$(database)/documents/courses/$(bundleParentId(courseId)))
+    && get(/databases/$(database)/documents/courses/$(bundleParentId(courseId))).data.get('published', false) == true
+    && get(/databases/$(database)/documents/courses/$(bundleParentId(courseId))).data.get('includedCourseIds', []).hasAny([courseId]);
   }
   match /users/{id} {
    allow read: if signedIn() && (request.auth.uid == id || can("users.view"));
@@ -66,7 +70,7 @@ service cloud.firestore {
     allow delete: if can("lectures.delete");
    }
    match /lectures/{lectureId} {
-    allow read: if can("lectures.manage") || (verified() && (courseAccess(id) || (publicAvailableCourse(id) && ((get(/databases/$(database)/documents/courses/$(id)).data.get('price', 0) == 0 && resource.data.get('freePreview',false) == true) || (trialActive() && resource.data.get('trialEnabled',false) == true)))));
+    allow read: if can("lectures.manage") || (verified() && (courseAccess(id) || ((publicAvailableCourse(id) && get(/databases/$(database)/documents/courses/$(id)).data.get('price', 0) == 0 && resource.data.get('freePreview',false) == true) || ((publicAvailableCourse(id) || publicBundleFolder(id)) && trialActive() && resource.data.get('trialEnabled',false) == true))));
     allow create, update: if can("lectures.manage");
     allow delete: if can("lectures.delete");
    }
