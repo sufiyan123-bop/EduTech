@@ -34,6 +34,16 @@ service cloud.firestore {
   function enrolled(courseId) { return verified() && exists(/databases/$(database)/documents/enrollments/$(request.auth.uid + '_' + courseId)); }
   function bundleAccess(courseId) { return verified() && exists(/databases/$(database)/documents/courses/$(courseId)) && get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', []).size() > 0 && enrolled(get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', [])[0]); }
   function courseAccess(courseId) { return enrolled(courseId) || bundleAccess(courseId); }
+  // Public metadata for an unpublished folder belonging to a published bundle.
+  // The private /lectures documents remain enrollment- or trial-protected.
+  function publicBundleFolder(courseId) {
+   return exists(/databases/$(database)/documents/courses/$(courseId))
+    && get(/databases/$(database)/documents/courses/$(courseId)).data.get('folderOnly', false) == true
+    && get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', []).size() > 0
+    && exists(/databases/$(database)/documents/courses/$(get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', [])[0]))
+    && get(/databases/$(database)/documents/courses/$(get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', [])[0])).data.get('published', false) == true
+    && get(/databases/$(database)/documents/courses/$(get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', [])[0])).data.get('includedCourseIds', []).hasAny([courseId]);
+  }
   match /users/{id} {
    allow read: if signedIn() && (request.auth.uid == id || can("users.view"));
    allow create: if signedIn() && request.auth.uid == id && request.resource.data.keys().hasOnly(['name','email','phone','createdAt']) && request.resource.data.email == request.auth.token.email;
@@ -41,7 +51,7 @@ service cloud.firestore {
    allow delete: if can("users.delete");
   }
   match /courses/{id} {
-   allow read: if resource.data.published == true || can("courses.view") || courseAccess(id);
+   allow read: if resource.data.published == true || publicBundleFolder(id) || can("courses.view") || courseAccess(id);
    allow create: if can("courses.create");
    allow update: if can("courses.edit");
    allow delete: if can("courses.delete");
@@ -51,7 +61,7 @@ service cloud.firestore {
     allow delete: if can("lectures.delete");
    }
    match /lectureCatalog/{lectureId} {
-    allow read: if publicAvailableCourse(id) || courseAccess(id) || can("lectures.manage");
+    allow read: if publicAvailableCourse(id) || publicBundleFolder(id) || courseAccess(id) || can("lectures.manage");
     allow create, update: if can("lectures.manage");
     allow delete: if can("lectures.delete");
    }
