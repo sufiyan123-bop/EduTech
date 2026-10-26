@@ -31,7 +31,14 @@ service cloud.firestore {
   function trialLessonAccess(courseId, lectureId) {
    return trialActive() && (publicAvailableCourse(courseId) || publicBundleFolder(courseId)) && exists(/databases/$(database)/documents/courses/$(courseId)/lectures/$(lectureId)) && get(/databases/$(database)/documents/courses/$(courseId)/lectures/$(lectureId)).data.get('trialEnabled',false) == true;
   }
-  function enrolled(courseId) { return verified() && exists(/databases/$(database)/documents/enrollments/$(request.auth.uid + '_' + courseId)); }
+  function enrolled(courseId) {
+   return verified()
+    && exists(/databases/$(database)/documents/enrollments/$(request.auth.uid + '_' + courseId))
+    && get(/databases/$(database)/documents/enrollments/$(request.auth.uid + '_' + courseId)).data.get('status','active') == 'active'
+    && get(/databases/$(database)/documents/enrollments/$(request.auth.uid + '_' + courseId)).data.get('expiresAt', timestamp.date(9999,12,31)) > request.time
+    && (get(/databases/$(database)/documents/enrollments/$(request.auth.uid + '_' + courseId)).data.get('source','admin') != 'razorpay'
+     || get(/databases/$(database)/documents/enrollments/$(request.auth.uid + '_' + courseId)).data.keys().hasAny(['expiresAt']));
+  }
   function bundleAccess(courseId) { return verified() && exists(/databases/$(database)/documents/courses/$(courseId)) && get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', []).size() > 0 && enrolled(get(/databases/$(database)/documents/courses/$(courseId)).data.get('includedInCourseIds', [])[0]); }
   function courseAccess(courseId) { return enrolled(courseId) || bundleAccess(courseId); }
   // Public metadata for an unpublished folder belonging to a published bundle.
@@ -89,6 +96,14 @@ service cloud.firestore {
   }
   match /tracks/{id} { allow read: if true; allow create: if can("categories.create"); allow update: if can("categories.edit"); allow delete: if can("categories.delete"); }
   match /enrollments/{id} { allow read: if can("enrollments.view") || (signedIn() && resource.data.userId == request.auth.uid); allow create: if can("enrollments.grant") && request.resource.data.userId is string && request.resource.data.courseId is string && id == request.resource.data.userId + "_" + request.resource.data.courseId; allow update: if can("enrollments.grant") && request.resource.data.userId == resource.data.userId && request.resource.data.courseId == resource.data.courseId; allow delete: if can("enrollments.revoke"); }
+  // Only trusted server functions create or modify payment records.
+  match /paymentOrders/{orderId} {
+   allow get, list: if admin() || (signedIn() && resource.data.userId == request.auth.uid);
+   allow create, update, delete: if false;
+  }
+  match /paymentFulfillments/{paymentId} {
+   allow read, write: if false;
+  }
   match /{document=**} { allow read, write: if false; }
  }
 }
