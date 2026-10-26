@@ -12,6 +12,8 @@ export async function POST(request){
   if(!snapshot.exists)throw httpError(404,"Course not found.");
   const course=snapshot.data();
   if(course.published!==true||course.status==="comingSoon"||course.folderOnly===true||(course.includedInCourseIds||[]).length>0||Number(course.price)<=0)throw httpError(400,"This course is not available for online purchase.");
+  const existingEnrollment=await db.collection("enrollments").doc(uid+"_"+courseId).get();
+  if(existingEnrollment.exists&&existingEnrollment.data().source!=="razorpay"&&!existingEnrollment.data().expiresAt&&existingEnrollment.data().status!=="revoked"&&existingEnrollment.data().status!=="inactive")throw httpError(409,"You already have lifetime access from the administrator; no purchase is needed.");
   const amountPaise=planPriceInPaise(course,months);
   if(!amountPaise)throw httpError(400,"The selected plan is not configured. Ask the administrator to add its price.");
   const razorpayOrder=await razorpayApi("POST","/orders",{amount:amountPaise,currency:"INR",receipt:uid.slice(0,12)+"_"+Date.now().toString(36),notes:{courseId,userId:uid,planMonths:String(months)}});
