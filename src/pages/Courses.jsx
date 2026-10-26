@@ -3,14 +3,102 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../services/firebase";
 import { Link, useSearchParams } from "react-router-dom";
-import { BookOpen, Clock3, Search, Sparkles, ArrowRight, CalendarDays } from "lucide-react";
-export default function Courses(){
- const [searchParams]=useSearchParams();
- const [customTracks,setCustomTracks]=useState([]);const [courses,setCourses]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(""),[search,setSearch]=useState(""),[category,setCategory]=useState("All"),[availability,setAvailability]=useState("All");
- useEffect(()=>{let active=true;getDocs(query(collection(db,"courses"),where("published","==",true))).then(s=>{if(active)setCourses(s.docs.map(d=>({id:d.id,...d.data()})))}).catch(()=>{if(active)setError("Courses could not be loaded. Please try again later.")}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[]);
- useEffect(()=>{const fromUrl=searchParams.get("track");if(fromUrl)setCategory(fromUrl)},[searchParams]);
- useEffect(()=>{getDocs(collection(db,"tracks")).then(s=>setCustomTracks(s.docs.map(d=>d.data().name).filter(Boolean))).catch(()=>{})},[]);
- const categories=useMemo(()=>["All",...new Set([...customTracks,...courses.map(c=>c.track).filter(Boolean)])], [courses,customTracks]);
- const visible=courses.filter(c=>!c.folderOnly&&!(c.includedInCourseIds||[]).length&&((c.title||"")+" "+(c.description||"")+" "+(c.track||"")).toLowerCase().includes(search.toLowerCase())&&(category==="All"||c.track===category)&&(availability==="All"||availability==="Coming Soon"&&c.status==="comingSoon"||availability==="Available"&&c.status!=="comingSoon")).sort((a,b)=>Number(Boolean(b.featured))-Number(Boolean(a.featured)));
- return <div className="min-h-[75vh] bg-slate-50"><section className="bg-slate-950 px-6 py-16 text-white"><div className="mx-auto max-w-6xl"><p className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-sky-300"><Sparkles size={18}/> Discover your next skill</p><h1 className="max-w-3xl text-4xl font-extrabold md:text-5xl">Explore our learning paths</h1><p className="mt-4 max-w-2xl text-slate-300">Browse practical technology courses. Find what's available today and see what's launching soon.</p></div></section><section className="mx-auto max-w-6xl px-6 py-10"><div className="grid gap-3 rounded-2xl border bg-white p-4 shadow-sm md:grid-cols-[1fr_210px_180px]"><label className="flex items-center gap-3 rounded-xl border px-4"><Search className="text-slate-400" size={20}/><input aria-label="Search courses" placeholder="Search by skill, course or topic" value={search} onChange={e=>setSearch(e.target.value)} className="w-full py-3 outline-none"/></label><select aria-label="Category" value={category} onChange={e=>setCategory(e.target.value)} className="rounded-xl border p-3">{categories.map(t=><option key={t}>{t}</option>)}</select><select aria-label="Availability" value={availability} onChange={e=>setAvailability(e.target.value)} className="rounded-xl border p-3">{["All","Available","Coming Soon"].map(x=><option key={x}>{x}</option>)}</select></div><div className="my-8 flex items-center justify-between"><h2 className="text-2xl font-bold text-slate-900">Courses</h2><p className="text-sm text-slate-500">{visible.length} results</p></div>{loading?<p className="rounded-2xl bg-white p-10 text-center">Loading courses…</p>:error?<p role="alert" className="rounded-2xl bg-red-50 p-8 text-red-700">{error}</p>:visible.length===0?<div className="rounded-2xl border bg-white p-12 text-center"><BookOpen className="mx-auto mb-4 text-slate-400" size={32}/><p className="font-bold">No matching courses yet</p><p className="mt-2 text-slate-500">Try another category or search term.</p></div>:<div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{visible.map(c=><article key={c.id} className="overflow-hidden rounded-2xl border bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"><div className="relative flex h-44 items-center justify-center bg-gradient-to-br from-blue-950 to-sky-700"><CourseThumbnail src={c.thumbnail} alt={c.title}/><div className="absolute left-4 top-4 flex flex-wrap gap-2">{c.status==="comingSoon"&&<span className="rounded-full bg-amber-400 px-3 py-1 text-xs font-extrabold text-slate-950">COMING SOON</span>}{c.badge&&<span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-blue-900">{c.badge}</span>}{c.featured&&<span className="rounded-full bg-blue-200 px-3 py-1 text-xs font-bold text-blue-950">Featured</span>}</div></div><div className="p-6"><p className="text-xs font-bold uppercase tracking-wider text-blue-700">{c.track||"Technology"}</p><h3 className="mt-2 min-h-14 text-xl font-extrabold text-slate-900">{c.title}</h3><p className="mt-2 line-clamp-2 min-h-10 text-sm text-slate-500">{c.description||"Build practical skills with a structured learning path."}</p><div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-500">{c.level&&<span>{c.level}</span>}{c.duration&&<span className="flex items-center gap-1"><Clock3 size={13}/>{c.duration}</span>}{c.language&&<span>{c.language}</span>}</div>{(c.includedCourseIds||[]).length>0&&<div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3"><p className="text-xs font-extrabold uppercase tracking-wide text-emerald-800">Included FREE with this course</p><p className="mt-1 text-sm text-emerald-950">{(c.includedCourseIds||[]).map(id=>courses.find(x=>x.id===id)?.title).filter(Boolean).join(" + ")||"Bonus courses included"}</p></div>}<Link to={"/courses/"+c.id} className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-blue-700">View course details <ArrowRight size={16}/></Link><div className="mt-5 border-t pt-4">{c.status==="comingSoon"?<><p className="font-bold text-amber-700">Enrollment opening soon</p>{c.launchDate&&<p className="mt-1 flex items-center gap-2 text-xs text-slate-500"><CalendarDays size={14}/>Expected: {c.launchDate}</p>}</>:<><p className="text-xl font-extrabold text-slate-900">{c.price? "₹"+Number(c.price).toLocaleString("en-IN"):"Free"}</p><p className="mt-2 text-xs text-slate-500">Enrollment is managed by the administrator. Trial access is available when activated.</p><Link to={"/learn/"+encodeURIComponent(c.id)} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white">Watch / Trial lessons <ArrowRight size={15}/></Link></>}</div></div></article>)}</div>}</section></div>
+import { ArrowRight, BookOpen, CheckCircle2, Clock3, Filter, Layers3, Search, Sparkles, X } from "lucide-react";
+
+const isTopLevel = course => !course.folderOnly && !(course.includedInCourseIds || []).length;
+const formatPrice = price => Number(price) > 0 ? "₹" + Number(price).toLocaleString("en-IN") : "Free";
+
+export default function Courses() {
+ const [searchParams] = useSearchParams();
+ const [courses, setCourses] = useState([]);
+ const [customTracks, setCustomTracks] = useState([]);
+ const [loading, setLoading] = useState(true);
+ const [error, setError] = useState("");
+ const [search, setSearch] = useState("");
+ const [category, setCategory] = useState(searchParams.get("track") || "All");
+ const [availability, setAvailability] = useState("All");
+
+ useEffect(() => {
+  let active = true;
+  getDocs(query(collection(db, "courses"), where("published", "==", true)))
+   .then(snapshot => { if (active) setCourses(snapshot.docs.map(d => ({ id: d.id, ...d.data() }))); })
+   .catch(() => { if (active) setError("Courses could not be loaded. Please try again later."); })
+   .finally(() => { if (active) setLoading(false); });
+  getDocs(collection(db, "tracks")).then(snapshot => {
+   if (active) setCustomTracks(snapshot.docs.map(d => d.data().name).filter(Boolean));
+  }).catch(() => {});
+  return () => { active = false; };
+ }, []);
+ useEffect(() => { setCategory(searchParams.get("track") || "All"); }, [searchParams]);
+
+ const topLevel = useMemo(() => courses.filter(isTopLevel), [courses]);
+ const categories = useMemo(() => ["All", ...new Set([...topLevel.map(c => c.track).filter(Boolean), ...customTracks])], [topLevel, customTracks]);
+ const visible = useMemo(() => topLevel.filter(c => {
+  const q = search.trim().toLowerCase();
+  const includedTitles = (c.includedCourseIds || []).map(id => courses.find(x => x.id === id)?.title || "").join(" ");
+  const matchesText = !q || [c.title, c.description, c.track, includedTitles].join(" ").toLowerCase().includes(q);
+  return matchesText && (category === "All" || c.track === category) &&
+   (availability === "All" || (availability === "Coming Soon" ? c.status === "comingSoon" : c.status !== "comingSoon"));
+ }).sort((a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured)) || Number(a.homeOrder ?? 999) - Number(b.homeOrder ?? 999) || (a.title || "").localeCompare(b.title || "")), [topLevel, courses, search, category, availability]);
+ const canReset = search || category !== "All" || availability !== "All";
+ function reset() { setSearch(""); setCategory("All"); setAvailability("All"); }
+
+ return <div className="min-h-[80vh] bg-[#f6f8fc]">
+  <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-[#102967] to-blue-800 text-white">
+   <div className="pointer-events-none absolute -right-16 -top-28 h-80 w-80 rounded-full bg-sky-400/20 blur-3xl"/>
+   <div className="pointer-events-none absolute bottom-0 left-1/4 h-44 w-96 rounded-full bg-blue-400/10 blur-3xl"/>
+   <div className="relative mx-auto max-w-7xl px-5 pb-16 pt-14 sm:px-8 sm:pb-20 sm:pt-20">
+    <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold tracking-wide text-sky-200"><Sparkles size={15}/> EXPLORE EDUTECH</span>
+    <div className="mt-5 grid gap-7 lg:grid-cols-[1fr_330px] lg:items-end">
+     <div><h1 className="max-w-3xl text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl lg:text-6xl">Learn skills that <span className="text-sky-300">move you forward.</span></h1><p className="mt-5 max-w-2xl text-base leading-7 text-slate-200 sm:text-lg">Discover practical tech courses and complete learning bundles. One main-course enrollment unlocks every course included inside it.</p></div>
+     <div className="grid grid-cols-2 gap-3 rounded-2xl border border-white/15 bg-white/10 p-5 backdrop-blur-sm">
+      <div><p className="text-3xl font-extrabold">{loading ? "—" : topLevel.length}</p><p className="mt-1 text-xs text-blue-100">Learning paths</p></div>
+      <div><p className="text-3xl font-extrabold">{loading ? "—" : topLevel.filter(c => (c.includedCourseIds || []).length > 0).length}</p><p className="mt-1 text-xs text-blue-100">Complete bundles</p></div>
+      <p className="col-span-2 border-t border-white/15 pt-3 text-sm text-blue-100"><CheckCircle2 size={16} className="mr-1 inline text-emerald-300"/> Structured lessons, all in one place</p>
+     </div>
+    </div>
+   </div>
+  </section>
+
+  <div className="relative mx-auto max-w-7xl px-5 pb-20 sm:px-8">
+   <div className="relative -mt-7 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-900/5 md:grid-cols-[minmax(0,1fr)_210px_185px]">
+    <label className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100">
+     <Search size={20} className="shrink-0 text-slate-400"/><input aria-label="Search courses" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search courses, skills, or modules..." className="w-full min-w-0 bg-transparent py-3.5 text-sm outline-none"/>
+     {search && <button type="button" aria-label="Clear search" onClick={() => setSearch("")}><X size={17} className="text-slate-400"/></button>}
+    </label>
+    <select aria-label="Category" value={category} onChange={e => setCategory(e.target.value)} className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-semibold text-slate-700 outline-blue-500">{categories.map(t => <option key={t} value={t}>{t === "All" ? "All categories" : t}</option>)}</select>
+    <select aria-label="Availability" value={availability} onChange={e => setAvailability(e.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-semibold text-slate-700 outline-blue-500">{["All", "Available", "Coming Soon"].map(t => <option key={t} value={t}>{t === "All" ? "All availability" : t}</option>)}</select>
+   </div>
+
+   <div className="mb-6 mt-11 flex flex-wrap items-end justify-between gap-4">
+    <div><p className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-[.17em] text-blue-700"><Filter size={15}/> Find your next course</p><h2 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-950 sm:text-3xl">{canReset ? "Search results" : "All learning paths"}</h2><p className="mt-2 text-sm text-slate-500">Every main course and its included modules, clearly organized.</p></div>
+    <div className="flex items-center gap-3"><span className="rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-600 shadow-sm">{loading ? "Loading..." : visible.length + " courses"}</span>{canReset && <button type="button" onClick={reset} className="text-sm font-bold text-blue-700 hover:underline">Clear filters</button>}</div>
+   </div>
+   {loading ? <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{[1,2,3,4,5,6].map(i => <div key={i} className="overflow-hidden rounded-2xl border bg-white"><div className="aspect-video animate-pulse bg-slate-200"/><div className="space-y-3 p-6"><div className="h-4 w-24 animate-pulse rounded bg-slate-200"/><div className="h-7 w-3/4 animate-pulse rounded bg-slate-200"/><div className="h-12 animate-pulse rounded bg-slate-100"/></div></div>)}</div>
+   : error ? <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-8 text-red-700">{error}</div>
+   : visible.length === 0 ? <div className="rounded-3xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm"><BookOpen size={40} className="mx-auto text-slate-400"/><h3 className="mt-4 text-xl font-extrabold text-slate-900">No courses found</h3><p className="mt-2 text-slate-500">{canReset ? "Try a different search or clear your filters." : "Published courses will appear here once they are added by the administrator."}</p>{canReset && <button onClick={reset} className="mt-5 rounded-xl bg-blue-700 px-5 py-3 text-sm font-bold text-white">Show all courses</button>}</div>
+   : <div className="grid items-stretch gap-6 sm:grid-cols-2 lg:grid-cols-3">{visible.map(c => {
+    const children = (c.includedCourseIds || []).map(id => courses.find(x => x.id === id)).filter(Boolean);
+    const childCount = (c.includedCourseIds || []).length;
+    const isBundle = childCount > 0;
+    return <article key={c.id} className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl">
+     <Link to={"/courses/" + encodeURIComponent(c.id)} aria-label={"View " + c.title} className="relative block aspect-video overflow-hidden bg-blue-950">
+      <CourseThumbnail src={c.thumbnail} alt={c.title} className="transition duration-500 group-hover:scale-105"/>
+      <div className="absolute left-3 top-3 flex flex-wrap gap-2">{c.status === "comingSoon" && <span className="rounded-lg bg-amber-400 px-2.5 py-1 text-[10px] font-extrabold uppercase text-slate-950">Coming soon</span>}{c.badge && <span className="rounded-lg bg-white/95 px-2.5 py-1 text-[10px] font-extrabold text-blue-900 shadow-sm">{c.badge}</span>}{c.featured && <span className="rounded-lg bg-sky-300 px-2.5 py-1 text-[10px] font-extrabold text-slate-950">Featured</span>}</div>
+      {isBundle && <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-lg bg-slate-950/85 px-3 py-1.5 text-xs font-bold text-white backdrop-blur-sm"><Layers3 size={14}/>{childCount} included {childCount === 1 ? "course" : "courses"}</span>}
+     </Link>
+     <div className="flex flex-1 flex-col p-5 sm:p-6">
+      <div className="flex items-center justify-between gap-2"><p className="text-[11px] font-extrabold uppercase tracking-[.13em] text-blue-700">{c.track || "Technology"}</p>{c.level && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">{c.level}</span>}</div>
+      <Link to={"/courses/" + encodeURIComponent(c.id)} className="mt-3"><h3 className="line-clamp-2 text-xl font-extrabold leading-snug text-slate-950 transition group-hover:text-blue-700">{c.title || "Untitled course"}</h3></Link>
+      <p className="mt-2 line-clamp-2 min-h-10 text-sm leading-6 text-slate-500">{c.description || "A structured learning path with practical video lessons."}</p>
+      <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">{c.duration && <span className="inline-flex items-center gap-1.5"><Clock3 size={14}/>{c.duration}</span>}{c.language && <span className="rounded-md bg-slate-100 px-2 py-1">{c.language}</span>}</div>
+      {isBundle && <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/70 p-3"><p className="flex items-center gap-2 text-xs font-extrabold text-blue-900"><Layers3 size={15}/> One enrollment, {childCount} included {childCount === 1 ? "course" : "courses"}</p><p className="mt-1.5 line-clamp-2 text-xs leading-5 text-blue-800">{children.length ? children.map(x => x.title).join(" · ") : "View the complete learning roadmap inside"}</p></div>}
+      <div className="mt-auto pt-5">
+       <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4"><div><p className="text-[11px] font-medium text-slate-500">{c.status === "comingSoon" ? "Launching soon" : "Course price"}</p><p className="mt-0.5 text-xl font-extrabold text-slate-950">{c.status === "comingSoon" ? "Coming soon" : formatPrice(c.price)}</p></div><Link to={"/courses/" + encodeURIComponent(c.id)} className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-xs font-extrabold text-white transition hover:bg-blue-800 sm:text-sm">View course <ArrowRight size={16}/></Link></div>
+      </div>
+     </div>
+    </article>;
+   })}</div>}
+  </div>
+ </div>;
 }
