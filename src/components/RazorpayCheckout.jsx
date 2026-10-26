@@ -9,7 +9,7 @@ function loadCheckout() {
  if (!scriptPromise) scriptPromise = new Promise((resolve,reject)=>{
   const s=document.createElement("script");
   s.src="https://checkout.razorpay.com/v1/checkout.js";
-  s.onload=()=>window.Razorpay?resolve():reject(Error("Checkout did not initialize."));
+  s.onload=()=>window.Razorpay?resolve():(scriptPromise=null,reject(Error("Checkout did not initialize.")));
   s.onerror=()=>{scriptPromise=null;reject(Error("Checkout script failed to load."));};
   document.head.appendChild(s);
  });
@@ -44,7 +44,7 @@ export default function RazorpayCheckout({course}) {
     }catch(e){setError(e.message+" If money was deducted, do not pay again until checking the status.");}
     finally{setBusy(false)}
    }});
-   instance.on("payment.failed",()=>{setError("Payment failed. Access has not been activated.");setBusy(false)});
+   instance.on("payment.failed",()=>{setError("Payment failed. You can retry inside Razorpay Checkout or close it.");});
    instance.open();
   }catch(e){setError(e.message||"Checkout unavailable.");setBusy(false)}
  }
