@@ -10,7 +10,7 @@ export function errorResponse(error) {
  return Response.json({error:status === 500 ? "Payment service temporarily unavailable." : error.message},{status,headers:{"Cache-Control":"no-store"}});
 }
 export function json(data, status=200) { return Response.json(data,{status,headers:{"Cache-Control":"no-store"}}); }
-export function gatewayConfigured() { return Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET && process.env.RAZORPAY_WEBHOOK_SECRET && (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY))); }
+export function gatewayConfigured() { return Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET && process.env.RAZORPAY_WEBHOOK_SECRET && process.env.PAYMENTS_RULES_CONFIRMED === "true" && (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY))); }
 function initializeFirebase(){
  if (getApps().length) return;
  const raw=process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
@@ -59,7 +59,8 @@ export async function fulfillCapturedPayment(payment, expectedOrderId){
   if(processedSnap.exists){
    const existing=db.collection("enrollments").doc(order.userId+"_"+order.courseId);
    const enrolled=await tx.get(existing);
-   return {status:"active",alreadyProcessed:true,expiresAt:enrolled.data()?.expiresAt?.toDate?.()?.toISOString()||null,courseId:order.courseId};
+   const active=enrolled.exists&&enrolled.data()?.status!=="revoked"&&enrolled.data()?.status!=="inactive"&&(!enrolled.data()?.expiresAt||enrolled.data().expiresAt.toMillis()>Date.now());
+   return {status:active?"active":"revoked",alreadyProcessed:true,expiresAt:enrolled.data()?.expiresAt?.toDate?.()?.toISOString()||null,courseId:order.courseId};
   }
   if(order.status==="paid")throw httpError(409,"This order has already been fulfilled.");
   const enrollmentRef=db.collection("enrollments").doc(order.userId+"_"+order.courseId);
