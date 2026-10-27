@@ -71,11 +71,15 @@ export async function isEnrolled(env,userId,courseId){
 export async function getLessonAccess(env,user,courseId,lectureId){
  const lesson=await env.DB.prepare(`SELECT l.*,c.published,c.price_inr,c.status,c.details_json FROM lectures l
  JOIN courses c ON c.id=l.course_id WHERE l.course_id=? AND l.id=?`).bind(courseId,lectureId).first();
- if(!lesson||!lesson.published)fail(404,"Lesson not found");
+ if(!lesson)fail(404,"Lesson not found");
  const admin=Boolean(user.staffActive&&(user.role==="owner"||JSON.parse(user.permissionsJson||"[]").includes("lectures.manage")));
  const paid=admin||await isEnrolled(env,user.id,courseId);
- const free=Number(lesson.price_inr)<=0;
- const trial=Boolean(user.trialExpiresAt>Math.floor(Date.now()/1000)&&lesson.trial_enabled);
+ const child=await env.DB.prepare(`SELECT 1 AS yes FROM course_inclusions i JOIN courses p ON p.id=i.parent_course_id WHERE i.child_course_id=? AND p.published=1 LIMIT 1`).bind(courseId).first();
+ const folderOnly=Boolean(JSON.parse(lesson.details_json||"{}").folderOnly);
+ const free=Boolean(lesson.published&&Number(lesson.price_inr)<=0&&lesson.free_preview);
+ const trial=Boolean((lesson.published||folderOnly&&child)&&lesson.status!=="comingSoon"&&user.trialExpiresAt>Math.floor(Date.now()/1000)&&lesson.trial_enabled);
+ if(!paid&&!admin&&!lesson.published&&!(folderOnly&&child&&trial))fail(404,"Lesson not available");
+ if(!paid&&!admin&&lesson.status==="comingSoon")fail(403,"Course is not available yet");
  if(!paid&&!free&&!trial)fail(403,"This lesson requires an active enrollment");
  return lesson;
 }
