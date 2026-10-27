@@ -5,7 +5,7 @@ export async function onRequestGet({env}){
   const [courses,includes]=await Promise.all([
    env.DB.prepare(`SELECT c.id,c.title,c.description,c.track,c.price_inr AS price,c.thumbnail,
     c.published,c.status,c.featured,c.sort_order AS homeOrder,c.details_json
-    FROM courses c WHERE c.published=1 AND NOT EXISTS(
+    FROM courses c WHERE c.published=1 AND COALESCE(json_extract(c.details_json,'$.folderOnly'),0)=0 AND NOT EXISTS(
       SELECT 1 FROM course_inclusions i WHERE i.child_course_id=c.id
     ) ORDER BY c.featured DESC,c.sort_order,c.title`).all(),
    env.DB.prepare(`SELECT i.parent_course_id AS parentId,c.id,c.title
