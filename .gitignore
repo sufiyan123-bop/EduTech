@@ -7,3 +7,13 @@ dist/
 functions/node_modules/
 functions/.env*
 *.log
+
+# Cloudflare local state and exported confidential migration data
+.wrangler/
+wrangler.toml
+wrangler.json
+wrangler.jsonc
+migration-tools/node_modules/
+migration-tools/exports/
+*.private.sql
+*.credentials.json
