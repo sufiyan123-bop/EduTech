@@ -1,4 +1,4 @@
-# EduTech
+# InfraRivet Academy
 
 Online IT education platform built with React, Vite, Tailwind CSS and Firebase.
 
