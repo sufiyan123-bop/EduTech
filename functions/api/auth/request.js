@@ -26,7 +26,7 @@ export async function onRequestPost(ctx){
   ).bind(email,codeHash,now+600,now,now,now-3600,now-3600).run();
   const response=await fetch("https://api.resend.com/emails",{
    method:"POST",headers:{"Authorization":"Bearer "+env.RESEND_API_KEY,"Content-Type":"application/json"},
-   body:JSON.stringify({from:env.EMAIL_FROM,to:[email],subject:"Your EduTech sign-in code",text:"Your EduTech one-time code is "+code+". It expires in 10 minutes. Never share this code."})
+   body:JSON.stringify({from:env.EMAIL_FROM,to:[email],subject:"Your InfraRivet Academy sign-in code",text:"Your InfraRivet Academy one-time code is "+code+". It expires in 10 minutes. Never share this code."})
   });
   if(!response.ok){
    await env.DB.prepare("DELETE FROM email_challenges WHERE email=? AND code_hash=?").bind(email,codeHash).run();
