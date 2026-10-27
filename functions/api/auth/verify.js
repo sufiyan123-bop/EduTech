@@ -23,6 +23,6 @@ export async function onRequestPost(ctx){
   }
   const token=randomToken(),hash=await sha256(token);
   await ctx.env.DB.prepare("INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)").bind(hash,userId,now+60*60*24*14).run();
-  return json({signedIn:true},{toString:()=>""} && 200,{"Set-Cookie":sessionCookie(ctx.request,token,60*60*24*14)});
+  return json({signedIn:true},200,{"Set-Cookie":sessionCookie(ctx.request,token,60*60*24*14)});
  }catch(e){return errorResponse(e)}
 }
