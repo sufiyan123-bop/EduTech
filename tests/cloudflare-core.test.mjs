@@ -24,12 +24,14 @@ test("Calendar-month renewals handle February",()=>{
  assert.equal(new Date(calendarMonths(Date.parse("2024-01-31T08:00:00Z"),1)*1000).toISOString(),"2024-02-29T08:00:00.000Z");
 });
 function context(lesson,{enrolled=false,included=false}={}){
- return {DB:{prepare(sql){return{bind(){return{async first(){
-  if(sql.includes("SELECT l.*"))return lesson;
-  if(sql.includes("FROM enrollments e"))return {direct:enrolled?1:0,bundled:0};
-  if(sql.includes("FROM course_inclusions i JOIN courses p"))return included?{yes:1}:null;
-  return null;
- }}}}}};
+ return {DB:{prepare:(sql)=>({
+  bind:()=>({first:async()=>{
+   if(sql.includes("SELECT l.*"))return lesson;
+   if(sql.includes("FROM enrollments e"))return {direct:enrolled?1:0,bundled:0};
+   if(sql.includes("FROM course_inclusions i JOIN courses p"))return included?{yes:1}:null;
+   return null;
+  }})
+ })}};
 }
 const user={id:"u",trialExpiresAt:0,staffActive:0};
 test("Included unpublished private folder remains accessible to parent enrollment",async()=>{
