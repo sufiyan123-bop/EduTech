@@ -1,0 +1,5 @@
+node_modules/
+exports/
+*.private.sql
+*.json.credentials
+serviceAccount*.json
