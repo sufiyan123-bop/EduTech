@@ -10,7 +10,7 @@ export async function onRequestGet({env}){
     ) ORDER BY c.featured DESC,c.sort_order,c.title`).all(),
    env.DB.prepare(`SELECT i.parent_course_id AS parentId,c.id,c.title
     FROM course_inclusions i JOIN courses c ON c.id=i.child_course_id
-    WHERE c.published=1 ORDER BY i.sort_order,c.title`).all()
+    ORDER BY i.sort_order,c.title`).all()
   ]);
   return json({courses:(courses.results||[]).map(c=>({
    ...c,...JSON.parse(c.details_json||"{}"),featured:Boolean(c.featured),
