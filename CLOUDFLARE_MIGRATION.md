@@ -68,7 +68,7 @@ Wrangler config in Git, review how it affects Pages production bindings before
 committing. Alternatively use Cloudflare dashboard's D1 console to execute the
 two versioned SQL migration files in order.
 
-You must apply **0001_cloudflare_core.sql** and **0002_auth.sql** before using the API.
+You must apply **0001_cloudflare_core.sql**, **0002_auth.sql**, and **0003_chapters.sql** before using the API.
 Check `/api/health` after binding DB.
 
 ### Part C — Export old Firebase data safely
