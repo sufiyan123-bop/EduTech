@@ -22,6 +22,6 @@ export async function POST(request){
    provider:"razorpay",providerOrderId:razorpayOrder.id,userId:uid,courseId,planMonths:months,
    amountPaise,currency:"INR",status:"created",createdAt:FieldValue.serverTimestamp()
   });
-  return json({keyId:process.env.RAZORPAY_KEY_ID,orderId:razorpayOrder.id,amount:amountPaise,currency:"INR",months,title:course.title||"EduTech course"});
+  return json({keyId:process.env.RAZORPAY_KEY_ID,orderId:razorpayOrder.id,amount:amountPaise,currency:"INR",months,title:course.title||"InfraRivet Academy course"});
  }catch(e){return errorResponse(e);}
 }
