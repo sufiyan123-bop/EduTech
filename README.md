@@ -1,4 +1,4 @@
-# EduTech — Cloudflare staging implementation
+# InfraRivet Academy — Cloudflare staging implementation
 
 React + Vite + Tailwind course website with Cloudflare Pages Functions, D1 and private R2.
 
