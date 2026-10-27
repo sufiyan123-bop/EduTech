@@ -35,7 +35,7 @@ export default function RazorpayCheckout({course}) {
   try {
    await loadCheckout();
    const order=await post("/api/payments/create-order",user,{courseId:course.id,months:selected.months});
-   const instance=new window.Razorpay({key:order.keyId,amount:order.amount,currency:"INR",order_id:order.orderId,name:"EduTech",description:course.title+" / "+selected.months+" months",prefill:{email:user.email||""},modal:{ondismiss:()=>setBusy(false)},handler:async payment=>{
+   const instance=new window.Razorpay({key:order.keyId,amount:order.amount,currency:"INR",order_id:order.orderId,name:"InfraRivet Academy",description:course.title+" / "+selected.months+" months",prefill:{email:user.email||""},modal:{ondismiss:()=>setBusy(false)},handler:async payment=>{
     setBusy(true);setMessage("Verifying payment...");
     try{
      const result=await post("/api/payments/verify",user,payment);
