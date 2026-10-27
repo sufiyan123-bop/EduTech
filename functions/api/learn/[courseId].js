@@ -11,7 +11,7 @@ export async function onRequestGet(ctx){
   const modules=[root,...(children.results||[])],now=Math.floor(Date.now()/1000);
   const assembled=await Promise.all(modules.map(async c=>{
    const [progress,paid]=await Promise.all([
-    db.prepare(`SELECT l.id,l.title,l.sort_order AS "order",l.trial_enabled AS trialEnabled,
+    db.prepare(`SELECT l.id,l.title,l.chapter,l.sort_order AS "order",l.trial_enabled AS trialEnabled,
       l.free_preview AS freePreview, IFNULL(p.completed,0) AS completed,c.price_inr AS price,c.published,c.status,c.details_json
       FROM lectures l JOIN courses c ON c.id=l.course_id
       LEFT JOIN lesson_progress p ON p.user_id=? AND p.course_id=l.course_id AND p.lecture_id=l.id
@@ -23,7 +23,7 @@ export async function onRequestGet(ctx){
     const folderOnly=Boolean(JSON.parse(l.details_json||"{}").folderOnly);
     const free=Boolean(l.published&&Number(l.price)<=0&&l.freePreview);
     const trial=Boolean((l.published||folderOnly&&c.id!==id)&&l.status!=="comingSoon"&&user.trialExpiresAt>now&&l.trialEnabled);
-    return {id:l.id,title:l.title,order:l.order,trialEnabled:Boolean(l.trialEnabled),
+    return {id:l.id,title:l.title,chapter:l.chapter||"General",order:l.order,trialEnabled:Boolean(l.trialEnabled),
      completed:Boolean(l.completed),locked:!(admin||paid||free||trial)};
    }),unlocked:admin||paid};
   }));
