@@ -8,7 +8,7 @@ export async function onRequestGet(ctx){
   if(!course)fail(404,"Course not found");
   const included=await ctx.env.DB.prepare(`SELECT c.id,c.title,c.description,c.thumbnail,c.track,c.price_inr AS price
    FROM course_inclusions i JOIN courses c ON c.id=i.child_course_id
-   WHERE i.parent_course_id=? AND c.published=1 ORDER BY i.sort_order,c.title`).bind(id).all();
+   WHERE i.parent_course_id=? ORDER BY i.sort_order,c.title`).bind(id).all();
   const modules=await Promise.all([course,...(included.results||[])].map(async c=>{
    const catalog=await ctx.env.DB.prepare(`SELECT id,title,sort_order AS "order",trial_enabled AS trialEnabled,free_preview AS freePreview
     FROM lectures WHERE course_id=? ORDER BY sort_order,title`).bind(c.id).all();
