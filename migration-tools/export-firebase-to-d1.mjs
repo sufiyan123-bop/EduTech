@@ -45,7 +45,7 @@ const [accounts,userDocs,courseDocs,enrollDocs,progressDocs,staffDocs,trackDocs,
  db.collection("staff").get(),db.collection("tracks").get(),
  db.collection("paymentOrders").get(),db.collection("system").doc("adminOwner").get()
 ]);
-SQL.push("PRAGMA foreign_keys = ON;","BEGIN TRANSACTION;");
+SQL.push("PRAGMA foreign_keys = ON;");
 const userData=new Map(userDocs.docs.map(d=>[d.id,d.data()]));
 const emails=new Set();
 for(const account of accounts){
@@ -92,8 +92,8 @@ for(const course of courseDocs.docs){
  for(const id of ids){
   const d=detailed.get(id)||{},m=metadata.get(id)||{};
   lectureIds.add(course.id+"/"+id);
-  insert("lectures",["id","course_id","title","sort_order","trial_enabled","free_preview","youtube_id","r2_object_key"],[
-   id,course.id,m.title||d.title||"Lesson",raw(Number(m.order??d.order??0)),raw(bool(m.trialEnabled??d.trialEnabled)),
+  insert("lectures",["id","course_id","title","chapter","sort_order","trial_enabled","free_preview","youtube_id","r2_object_key"],[
+   id,course.id,m.title||d.title||"Lesson",m.chapter||d.chapter||m.section||d.section||"General",raw(Number(m.order??d.order??0)),raw(bool(m.trialEnabled??d.trialEnabled)),
    raw(bool(m.freePreview??d.freePreview)),d.youtubeId||null,null
   ]);
  }
@@ -144,7 +144,7 @@ for(const doc of orderDocs.docs){
   raw(epoch(d.createdAt)||Math.floor(Date.now()/1000)),raw(epoch(d.paidAt))
  ]);
 }
-SQL.push("COMMIT;");
+// Wrangler D1 import manages statements; explicit BEGIN/COMMIT are not emitted.
 await mkdir(resolve(process.cwd(),"exports"),{recursive:true,mode:0o700});
 const f=await open(out,"w",0o600);try{await f.writeFile(SQL.join("\n")+"\n")}finally{await f.close()}
 console.log("Private D1 SQL saved (DO NOT COMMIT):",out);
