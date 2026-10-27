@@ -1,4 +1,4 @@
-# EduTech → Cloudflare migration
+# InfraRivet Academy → Cloudflare migration
 
 ## Current status
 
@@ -14,7 +14,7 @@
 It still requires Cloudflare account bindings and credentials, safe data import, user
 identity verification, end-to-end live testing and final domain cutover.
 
-**Do not delete Firebase or switch edutech-in.vercel.app yet.**
+**Do not delete Firebase or change traffic on the existing legacy edutech-in.vercel.app deployment yet.**
 
 ## Target architecture
 
@@ -29,9 +29,9 @@ old data**. It can be deleted once migration is verified and backed up.
 ### Part A — Cloudflare account and resources
 
 1. In https://dash.cloudflare.com/ create your account and connect GitHub.
-2. **D1**: create `edutech-db`, note database ID. Bind it to your **new, isolated Pages
+2. **D1**: create `infrarivet-db`, note database ID. Bind it to your **new, isolated Pages
    project** with variable name `DB` under Settings → Bindings (Preview and Production).
-3. **R2**: create bucket `edutech-videos`. Keep it **private**. Bind R2 bucket to your
+3. **R2**: create bucket `infrarivet-videos`. Keep it **private**. Bind R2 bucket to your
    Pages project using variable `VIDEOS`. Do not enable public access.
 4. **Pages**: Create application → Pages → Connect to GitHub → select
    `sufiyan123-bop/EduTech`; test using `cloudflare-migration` branch in a new
@@ -42,7 +42,7 @@ old data**. It can be deleted once migration is verified and backed up.
    `TURNSTILE_SECRET` as a **server-only secret** in Pages.
 6. **Resend**: get a verified sending domain from https://resend.com/.
    In Pages server-only environment secrets set `RESEND_API_KEY` and
-   `EMAIL_FROM` (example `EduTech <login@yourdomain.com>`).
+   `EMAIL_FROM` (example `InfraRivet Academy <login@yourdomain.com>`).
    This is needed for email OTP sign-in. Existing Firebase passwords cannot be
    read or copied; migrated students sign in by proving ownership of their email.
 7. Generate `OTP_HASH_SECRET` as a cryptographically random, at least 32-character
@@ -60,7 +60,7 @@ database ID (see Cloudflare Pages Wrangler configuration docs), apply migrations
 ```bash
 npm install
 npx wrangler login
-npx wrangler d1 migrations apply edutech-db --remote
+npx wrangler d1 migrations apply infrarivet-db --remote
 ```
 
 The Wrangler config with your actual database ID can stay local; if you use a
@@ -87,7 +87,7 @@ npm install
 npm run export
 ```
 
-The script writes `migration-tools/exports/edutech-d1.private.sql` with file
+The script writes `migration-tools/exports/infrarivet-d1.private.sql` with file
 permissions 0600. It exports Firebase Auth user IDs/emails, users, courses,
 parent-child bundles, lectures, study progress, active enrollments, team permissions,
 categories and payment orders. Existing Firebase video URLs remain YouTube;
@@ -103,7 +103,7 @@ idempotent migration plan.
 Example:
 
 ```bash
-npx wrangler d1 execute edutech-db --remote --file=migration-tools/exports/edutech-d1.private.sql
+npx wrangler d1 execute infrarivet-db --remote --file=migration-tools/exports/infrarivet-d1.private.sql
 ```
 
 The example assumes you ran Wrangler from repository root and its config points
