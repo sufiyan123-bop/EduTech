@@ -1,0 +1,47 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {hmacHex,verifyHmac,sanitizeCourseBody,getLessonAccess} from "../functions/_lib/core.js";
+import {calendarMonths,paymentConfigured} from "../functions/_lib/payments.js";
+test("Cloudflare OTP HMAC rejects changed email or code",async()=>{
+ const sig=await hmacHex("long-example-test-secret","student@example.com:123456");
+ assert.equal(await verifyHmac("long-example-test-secret","student@example.com:123456",sig),true);
+ assert.equal(await verifyHmac("long-example-test-secret","student@example.com:111111",sig),false);
+ assert.equal(await verifyHmac("long-example-test-secret","other@example.com:123456",sig),false);
+ assert.equal(await verifyHmac("long-example-test-secret","student@example.com:123456","bad"),false);
+});
+test("Course sanitizer removes duplicate included IDs and rejects invalid pricing",()=>{
+ const c=sanitizeCourseBody({title:"AiOps",price:"2000",includedCourseIds:["linux","python","linux"]});
+ assert.deepEqual(c.included,["linux","python"]);
+ assert.throws(()=>sanitizeCourseBody({title:"",price:10}),/title/);
+ assert.throws(()=>sanitizeCourseBody({title:"AiOps",price:-1}),/price/);
+});
+test("Payment configuration requires a deliberate enable switch",()=>{
+ const env={RAZORPAY_KEY_ID:"key",RAZORPAY_KEY_SECRET:"secret",RAZORPAY_WEBHOOK_SECRET:"hook"};
+ assert.equal(paymentConfigured(env),false);
+ assert.equal(paymentConfigured({...env,PAYMENTS_ENABLED:"true"}),true);
+});
+test("Calendar-month renewals handle February",()=>{
+ assert.equal(new Date(calendarMonths(Date.parse("2024-01-31T08:00:00Z"),1)*1000).toISOString(),"2024-02-29T08:00:00.000Z");
+});
+function context(lesson,{enrolled=false,included=false}={}){
+ return {DB:{prepare(sql){return{bind(){return{async first(){
+  if(sql.includes("SELECT l.*"))return lesson;
+  if(sql.includes("FROM enrollments e"))return {direct:enrolled?1:0,bundled:0};
+  if(sql.includes("FROM course_inclusions i JOIN courses p"))return included?{yes:1}:null;
+  return null;
+ }}}}}};
+}
+const user={id:"u",trialExpiresAt:0,staffActive:0};
+test("Included unpublished private folder remains accessible to parent enrollment",async()=>{
+ const lesson={published:0,price_inr:0,free_preview:0,trial_enabled:0,status:"available",details_json:'{"folderOnly":true}'};
+ assert.deepEqual(await getLessonAccess(context(lesson,{enrolled:true,included:true}),user,"linux","lesson"),lesson);
+});
+test("Unpublished folder is not automatically free for an unenrolled user",async()=>{
+ const lesson={published:0,price_inr:0,free_preview:1,trial_enabled:0,status:"available",details_json:'{"folderOnly":true}'};
+ await assert.rejects(getLessonAccess(context(lesson,{included:true}),user,"linux","lesson"),/Lesson not available/);
+});
+test("Published free course still requires a free-preview flag",async()=>{
+ const lesson={published:1,price_inr:0,free_preview:0,trial_enabled:0,status:"available",details_json:"{}"};
+ await assert.rejects(getLessonAccess(context(lesson),user,"public","lesson"),/requires an active enrollment/);
+ assert.deepEqual(await getLessonAccess(context({...lesson,free_preview:1}),user,"public","lesson"),{...lesson,free_preview:1});
+});
