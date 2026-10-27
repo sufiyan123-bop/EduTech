@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {"export": "node export-firebase-to-d1.mjs"},
+  "dependencies": {"firebase-admin": "^13.4.0"}
+}
