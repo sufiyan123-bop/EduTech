@@ -12,7 +12,7 @@ import {resolve} from "node:path";
 if(!process.env.GOOGLE_APPLICATION_CREDENTIALS)throw Error("Set GOOGLE_APPLICATION_CREDENTIALS to your local service-account JSON path.");
 initializeApp({credential:applicationDefault()});
 const db=getFirestore(),auth=getAuth(),SQL=[],counts={},userIds=new Set(),courseIds=new Set(),lectureIds=new Set();
-const out=resolve(process.cwd(),"exports","edutech-d1.private.sql");
+const out=resolve(process.cwd(),"exports","infrarivet-d1.private.sql");
 const q=v=>v==null?"NULL":"'"+String(v).replaceAll("\0","").replaceAll("'","''")+"'";
 const n=v=>Number.isFinite(Number(v))?String(Number(v)):"NULL";
 const bool=v=>v?1:0;
