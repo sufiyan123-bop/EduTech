@@ -2,7 +2,7 @@
 export class HttpError extends Error { constructor(status, message){super(message);this.status=status;} }
 export function fail(status,message){throw new HttpError(status,message);}
 export function json(data,status=200,headers={}){return Response.json(data,{status,headers:{"Cache-Control":"no-store",...headers}});}
-export function errorResponse(e){if(!(e instanceof HttpError))console.error("EduTech API error",e);return json({error:e instanceof HttpError?e.message:"Service temporarily unavailable" },e instanceof HttpError?e.status:503);}
+export function errorResponse(e){if(!(e instanceof HttpError))console.error("InfraRivet Academy API error",e);return json({error:e instanceof HttpError?e.message:"Service temporarily unavailable" },e instanceof HttpError?e.status:503);}
 export async function bodyJson(request,limit=20000){
  const size=Number(request.headers.get("content-length")||0);
  if(size>limit)fail(413,"Request too large");
@@ -34,12 +34,12 @@ export async function verifyHmac(secret,value,hexSignature){
 }
 export function sessionCookie(request,value,maxAge){
  const secure=new URL(request.url).protocol==="https:"?"; Secure":"";
- return "edutech_session="+value+"; HttpOnly; SameSite=Lax; Path=/; Max-Age="+maxAge+secure;
+ return "infrarivet_session="+value+"; HttpOnly; SameSite=Lax; Path=/; Max-Age="+maxAge+secure;
 }
 export async function optionalUser(ctx){
  if(!ctx.env.DB)return null;
  const cookie=ctx.request.headers.get("cookie")||"";
- const token=cookie.match(/(?:^|;\s*)edutech_session=([0-9a-f]{64})(?:;|$)/)?.[1];
+ const token=cookie.match(/(?:^|;\s*)infrarivet_session=([0-9a-f]{64})(?:;|$)/)?.[1];
  if(!token)return null;
  const hash=await sha256(token);
  const user=await ctx.env.DB.prepare(`SELECT u.id, u.email, u.display_name AS name,
