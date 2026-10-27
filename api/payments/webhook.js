@@ -3,7 +3,7 @@ import { webhookSignatureMatches } from "../_lib/signatures.js";
 // Opening the endpoint in a browser is a GET; actual Razorpay delivery uses signed POST.
 export function GET(){
  return json({
-  endpoint:"EduTech Razorpay webhook",
+  endpoint:"InfraRivet Academy Razorpay webhook",
   status:"available",
   configured:gatewayConfigured(),
   note:"This is a machine-to-machine endpoint. Razorpay must send a signed POST; opening this URL in a browser does not test payment delivery.",
