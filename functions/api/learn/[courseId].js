@@ -3,7 +3,8 @@ export async function onRequestGet(ctx){
  try{
   const user=await requireUser(ctx),db=ctx.env.DB,id=String(ctx.params.courseId||"");
   const root=await db.prepare("SELECT id,title,description,thumbnail,track,published FROM courses WHERE id=?").bind(id).first();
-  if(!root||!root.published)fail(404,"Course not found");
+  if(!root)fail(404,"Course not found");
+  if(!root.published&&!await isEnrolled(ctx.env,user.id,id))fail(404,"Course not found");
   const children=await db.prepare(`SELECT c.id,c.title,c.description,c.thumbnail,c.track,c.published
    FROM course_inclusions i JOIN courses c ON c.id=i.child_course_id
    WHERE i.parent_course_id=? AND c.published=1 ORDER BY i.sort_order,c.title`).bind(id).all();
