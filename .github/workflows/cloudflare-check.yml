@@ -29,5 +29,7 @@ jobs:
           PY
       - name: Verify data migration tool syntax
         run: node --check migration-tools/export-firebase-to-d1.mjs
+      - name: Compile Cloudflare Pages Functions
+        run: npx wrangler pages functions build functions --outfile /tmp/edutech-worker.mjs
       - name: Tests and Vite build
         run: npm run build
