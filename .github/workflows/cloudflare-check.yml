@@ -16,5 +16,18 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Validate Functions syntax
         run: find functions -type f -name '*.js' -print0 | xargs -0 -n 1 node --check
+      - name: Verify SQLite/D1 migration scripts
+        run: |
+          python3 - <<'PY'
+          import pathlib, sqlite3
+          db = sqlite3.connect(":memory:")
+          for path in sorted(pathlib.Path("migrations").glob("*.sql")):
+              db.executescript(path.read_text())
+          assert db.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='sessions'").fetchone()[0] == 1
+          assert "chapter" in [r[1] for r in db.execute("PRAGMA table_info(lectures)")]
+          print("D1 schema migrated successfully")
+          PY
+      - name: Verify data migration tool syntax
+        run: node --check migration-tools/export-firebase-to-d1.mjs
       - name: Tests and Vite build
         run: npm run build
