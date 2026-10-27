@@ -8,7 +8,13 @@ export async function onRequestPost(ctx){
   if(![1,3,6,12].includes(months))fail(400,"Invalid plan duration");
   const course=await ctx.env.DB.prepare("SELECT id,title,status,published,details_json FROM courses WHERE id=?").bind(id).first();
   if(!course||!course.published||course.status==="comingSoon")fail(404,"Course not available");
-  const plans=JSON.parse(course.details_json||"{}").plans||{};
+  const details=JSON.parse(course.details_json||"{}");
+  if(details.folderOnly)fail(400,"Only the main course can be purchased.");
+  const bundled=await ctx.env.DB.prepare("SELECT 1 AS included FROM course_inclusions WHERE child_course_id=? LIMIT 1").bind(id).first();
+  if(bundled)fail(400,"This course is included with its main course. Purchase the main course instead.");
+  const existing=await ctx.env.DB.prepare("SELECT source FROM enrollments WHERE user_id=? AND course_id=? AND (expires_at IS NULL OR expires_at>unixepoch())").bind(user.id,id).first();
+  if(existing?.source==="admin")fail(409,"You already have access to this course.");
+  const plans=details.plans||{};
   const raw=plans[String(months)];
   const inr=Number(raw&&typeof raw==="object"?raw.price:raw);
   if(!Number.isSafeInteger(inr)||inr<=0||inr>10000000)fail(400,"This access plan is not available");
