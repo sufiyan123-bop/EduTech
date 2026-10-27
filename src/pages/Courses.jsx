@@ -48,7 +48,7 @@ export default function Courses() {
    <div className="pointer-events-none absolute -right-16 -top-28 h-80 w-80 rounded-full bg-sky-400/20 blur-3xl"/>
    <div className="pointer-events-none absolute bottom-0 left-1/4 h-44 w-96 rounded-full bg-blue-400/10 blur-3xl"/>
    <div className="relative mx-auto max-w-7xl px-5 pb-14 pt-12 sm:px-8 sm:pb-16 sm:pt-16">
-    <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold tracking-wide text-sky-200"><Sparkles size={15}/> EXPLORE EDUTECH</span>
+    <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold tracking-wide text-sky-200"><Sparkles size={15}/> EXPLORE INFRARIVET ACADEMY</span>
     <div className="mt-5 grid gap-7 lg:grid-cols-[1fr_290px] lg:items-end">
      <div><h1 className="max-w-3xl text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl lg:text-6xl">Your next big skill starts <span className="text-sky-300">right here.</span></h1><p className="mt-5 max-w-2xl text-base leading-7 text-slate-200 sm:text-lg">Explore career-focused courses with clear learning paths. Choose one master course and unlock all the courses included in its bundle.</p></div>
      <div className="grid grid-cols-2 gap-3 rounded-2xl border border-white/15 bg-white/10 p-5 backdrop-blur-sm">
