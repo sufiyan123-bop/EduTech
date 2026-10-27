@@ -1,8 +1,17 @@
 import {requireUser,requireStaff,checkOrigin,bodyJson,json,fail,errorResponse} from "../../_lib/core.js";
 const clean=d=>{
  const title=String(d.title||"").trim().slice(0,220);if(!title)fail(400,"Lecture title is required");
- const youtube=String(d.youtubeId||"").trim(),r2=String(d.r2ObjectKey||"").trim();
- if(youtube&&!/^[\w-]{11}$/.test(youtube))fail(400,"YouTube video ID must be 11 characters");
+ const raw=String(d.youtubeId||"").trim(),r2=String(d.r2ObjectKey||"").trim();
+ let youtube=raw;
+ if(raw&&!/^[\w-]{11}$/.test(raw)){
+  try{
+   const url=new URL(raw),host=url.hostname.toLowerCase().replace(/^www\./,"");
+   const valid=["youtube.com","m.youtube.com","music.youtube.com","youtube-nocookie.com","youtu.be"].includes(host)&&url.protocol==="https:";
+   if(!valid)throw Error("Invalid YouTube host");
+   youtube=host==="youtu.be"?url.pathname.split("/")[1]:(url.searchParams.get("v")||url.pathname.match(/^\/(?:embed|shorts|live)\/([^/]+)/)?.[1]||"");
+  }catch{fail(400,"Enter a valid YouTube video link or ID")}
+ }
+ if(youtube&&!/^[\w-]{11}$/.test(youtube))fail(400,"Enter a valid YouTube video link or ID");
  if(r2&&(!r2.startsWith("lessons/")||r2.includes("..")||r2.length>500))fail(400,"Invalid private video key");
  return {title,youtube,r2,chapter:String(d.chapter||"General").trim().slice(0,160)||"General",order:Number.isFinite(Number(d.order))?Number(d.order):0,trial:d.trialEnabled?1:0,preview:d.freePreview?1:0};
 };
