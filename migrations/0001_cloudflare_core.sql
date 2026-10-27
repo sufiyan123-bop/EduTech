@@ -1,4 +1,4 @@
--- EduTech Cloudflare D1 initial schema (SQLite).
+-- InfraRivet Academy Cloudflare D1 initial schema (SQLite).
 -- All tables are empty until the Firebase data is explicitly migrated.
 PRAGMA foreign_keys = ON;
 
