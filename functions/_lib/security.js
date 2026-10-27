@@ -8,7 +8,7 @@ async function digest(p,s,n=ITERATIONS){const k=await crypto.subtle.importKey("r
 function equal(a,b){if(typeof a!=="string"||typeof b!=="string"||a.length!==b.length)return false;let v=0;for(let i=0;i<a.length;i++)v|=a.charCodeAt(i)^b.charCodeAt(i);return v===0}
 export async function createCredentials(db,id,password){const salt=random(16);await db.prepare("INSERT INTO credentials(user_id,password_salt,password_hash,password_iterations) VALUES(?,?,?,?)").bind(id,salt,await digest(password,salt),ITERATIONS).run()}
 export async function verifyCredentials(db,id,password){const row=await db.prepare("SELECT password_salt,password_hash,password_iterations FROM credentials WHERE user_id=?").bind(id).first();if(!row){await digest(password,"0".repeat(32));return false}return equal(await digest(password,row.password_salt,row.password_iterations),row.password_hash)}
-const COOKIE="edutech_session";
+const COOKIE="infrarivet_session";
 const opt=(r,age)=>`Path=/; HttpOnly; SameSite=Lax${new URL(r.url).protocol==="https:"?"; Secure":""}; Max-Age=${age}`;
 const getToken=r=>(r.headers.get("Cookie")||"").split(";").map(s=>s.trim()).find(s=>s.startsWith(COOKIE+"="))?.slice(COOKIE.length+1);
 export async function issueSession(db,r,id){const token=random(),ttl=604800;await db.prepare("INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)").bind(await hash(token),id,Math.floor(Date.now()/1000)+ttl).run();return `${COOKIE}=${token}; ${opt(r,ttl)}`}
