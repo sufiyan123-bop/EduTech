@@ -69,7 +69,7 @@ export async function isEnrolled(env,userId,courseId){
  return Boolean(row?.direct||row?.bundled);
 }
 export async function getLessonAccess(env,user,courseId,lectureId){
- const lesson=await env.DB.prepare(`SELECT l.*,c.published,c.price_inr FROM lectures l
+ const lesson=await env.DB.prepare(`SELECT l.*,c.published,c.price_inr,c.status,c.details_json FROM lectures l
  JOIN courses c ON c.id=l.course_id WHERE l.course_id=? AND l.id=?`).bind(courseId,lectureId).first();
  if(!lesson||!lesson.published)fail(404,"Lesson not found");
  const admin=Boolean(user.staffActive&&(user.role==="owner"||JSON.parse(user.permissionsJson||"[]").includes("lectures.manage")));
