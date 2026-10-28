@@ -12,7 +12,20 @@ export function AuthProvider({children}){
 }
 function TurnstileBox({onToken}){
  const div=useRef(null),widget=useRef(null);
- const siteKey=import.meta.env.VITE_TURNSTILE_SITE_KEY;
+ const [runtimeSiteKey,setRuntimeSiteKey]=useState("");
+ const [checkingConfig,setCheckingConfig]=useState(!import.meta.env.VITE_TURNSTILE_SITE_KEY);
+ const siteKey=import.meta.env.VITE_TURNSTILE_SITE_KEY || runtimeSiteKey;
+ // Pages build variables may be absent even when the site key is set for Functions.
+ useEffect(()=>{
+  if(import.meta.env.VITE_TURNSTILE_SITE_KEY)return;
+  let active=true;
+  fetch("/api/public-config",{cache:"no-store"})
+   .then(r=>r.ok?r.json():null)
+   .then(d=>{if(active&&d?.turnstileSiteKey)setRuntimeSiteKey(d.turnstileSiteKey)})
+   .catch(()=>{})
+   .finally(()=>{if(active)setCheckingConfig(false)});
+  return()=>{active=false};
+ },[]);
  useEffect(()=>{
   if(!siteKey)return;
   let active=true;const script=document.createElement("script");
@@ -24,7 +37,7 @@ function TurnstileBox({onToken}){
   if(window.turnstile)display();else document.head.appendChild(script);
   return()=>{active=false;try{if(widget.current!==null)window.turnstile?.remove(widget.current)}catch{};script.remove()}
  },[siteKey]);
- return <div>{siteKey?<div ref={div} className="min-h-16"/>:<p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">Secure login is pending Cloudflare Turnstile configuration.</p>}</div>;
+ return <div>{siteKey?<div ref={div} className="min-h-16"/>:<p className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">{checkingConfig?"Loading secure login check...":"Secure login is pending Cloudflare Turnstile configuration."}</p>}</div>;
 }
 export function Login({signup=false}){
  const {setUser}=useAuth(),navigate=useNavigate();
@@ -41,5 +54,5 @@ export function Login({signup=false}){
    }
   }catch(e){setError(e.message)}finally{setBusy(false)}
  }
- return <div className="min-h-[75vh] bg-slate-50 px-5 py-16"><div className="mx-auto max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-900/5"><div className="bg-gradient-to-br from-slate-950 to-blue-800 px-7 py-9 text-white"><div className="mb-4 inline-flex rounded-xl bg-white/10 p-3"><KeyRound/></div><h1 className="text-3xl font-extrabold">{signup?"Join EduTech":"Welcome back"}</h1><p className="mt-2 text-sm text-slate-200">Secure email login — no password needed.</p></div><form onSubmit={submit} className="space-y-5 p-7">{phase==="email"?<>{signup&&<label className="block text-sm font-semibold">Your name<input required value={name} onChange={e=>setName(e.target.value)} autoComplete="name" className="mt-2 w-full rounded-xl border p-3"/></label>}<label className="block text-sm font-semibold">Email address<div className="mt-2 flex items-center gap-2 rounded-xl border px-3"><Mail size={18} className="text-slate-400"/><input type="email" required value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" className="w-full py-3 outline-none"/></div></label><TurnstileBox onToken={setToken}/></>:<><p className="text-sm text-slate-600">We've sent a code to <strong>{email}</strong>.</p><label className="block text-sm font-semibold">6-digit verification code<input value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))} inputMode="numeric" autoComplete="one-time-code" maxLength={6} required className="mt-2 w-full rounded-xl border p-3 text-center text-2xl font-bold tracking-[.4em]"/></label><button type="button" onClick={()=>{setPhase("email");setCode("")}} className="text-sm font-bold text-blue-700">Change email / resend code</button></>}{message&&<p className="text-sm text-emerald-700" role="status">{message}</p>}{error&&<p className="rounded-xl bg-red-50 p-3 text-sm text-red-700" role="alert">{error}</p>}<button disabled={busy||(phase==="email"&&!token)||(phase==="code"&&code.length!==6)} className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3.5 font-extrabold text-white hover:bg-blue-800 disabled:opacity-50">{busy?"Please wait...":phase==="email"?"Send login code":"Verify & continue"}<ArrowRight size={18}/></button><div className="flex items-center justify-center gap-2 text-xs text-slate-500"><ShieldCheck size={16}/> Your courses stay connected to your email</div><p className="text-center text-sm text-slate-600">{signup?"Already a student?":"New to EduTech?"} <Link className="font-bold text-blue-700 hover:underline" to={signup?"/login":"/signup"}>{signup?"Sign in":"Create account"}</Link></p></form></div></div>;
+ return <div className="min-h-[75vh] bg-slate-50 px-5 py-16"><div className="mx-auto max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-900/5"><div className="bg-gradient-to-br from-slate-950 to-blue-800 px-7 py-9 text-white"><div className="mb-4 inline-flex rounded-xl bg-white/10 p-3"><KeyRound/></div><h1 className="text-3xl font-extrabold">{signup?"Join InfraRivet Academy":"Welcome back"}</h1><p className="mt-2 text-sm text-slate-200">Secure email login — no password needed.</p></div><form onSubmit={submit} className="space-y-5 p-7">{phase==="email"?<>{signup&&<label className="block text-sm font-semibold">Your name<input required value={name} onChange={e=>setName(e.target.value)} autoComplete="name" className="mt-2 w-full rounded-xl border p-3"/></label>}<label className="block text-sm font-semibold">Email address<div className="mt-2 flex items-center gap-2 rounded-xl border px-3"><Mail size={18} className="text-slate-400"/><input type="email" required value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" className="w-full py-3 outline-none"/></div></label><TurnstileBox onToken={setToken}/></>:<><p className="text-sm text-slate-600">We've sent a code to <strong>{email}</strong>.</p><label className="block text-sm font-semibold">6-digit verification code<input value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))} inputMode="numeric" autoComplete="one-time-code" maxLength={6} required className="mt-2 w-full rounded-xl border p-3 text-center text-2xl font-bold tracking-[.4em]"/></label><button type="button" onClick={()=>{setPhase("email");setCode("")}} className="text-sm font-bold text-blue-700">Change email / resend code</button></>}{message&&<p className="text-sm text-emerald-700" role="status">{message}</p>}{error&&<p className="rounded-xl bg-red-50 p-3 text-sm text-red-700" role="alert">{error}</p>}<button disabled={busy||(phase==="email"&&!token)||(phase==="code"&&code.length!==6)} className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3.5 font-extrabold text-white hover:bg-blue-800 disabled:opacity-50">{busy?"Please wait...":phase==="email"?"Send login code":"Verify & continue"}<ArrowRight size={18}/></button><div className="flex items-center justify-center gap-2 text-xs text-slate-500"><ShieldCheck size={16}/> Your courses stay connected to your email</div><p className="text-center text-sm text-slate-600">{signup?"Already a student?":"New to InfraRivet Academy?"} <Link className="font-bold text-blue-700 hover:underline" to={signup?"/login":"/signup"}>{signup?"Sign in":"Create account"}</Link></p></form></div></div>;
 }
