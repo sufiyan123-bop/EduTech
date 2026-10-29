@@ -15,10 +15,13 @@ test("Course sanitizer removes duplicate included IDs and rejects invalid pricin
  assert.throws(()=>sanitizeCourseBody({title:"",price:10}),/title/);
  assert.throws(()=>sanitizeCourseBody({title:"AiOps",price:-1}),/price/);
 });
-test("Payment configuration requires a deliberate enable switch",()=>{
- const env={RAZORPAY_KEY_ID:"key",RAZORPAY_KEY_SECRET:"secret",RAZORPAY_WEBHOOK_SECRET:"hook"};
+test("Payment configuration requires explicit safe mode and enable switch",()=>{
+ const env={RAZORPAY_KEY_ID:"rzp_test_sample123",RAZORPAY_KEY_SECRET:"secret",RAZORPAY_WEBHOOK_SECRET:"hook"};
  assert.equal(paymentConfigured(env),false);
- assert.equal(paymentConfigured({...env,PAYMENTS_ENABLED:"true"}),true);
+ assert.equal(paymentConfigured({...env,PAYMENTS_ENABLED:"true"}),false);
+ assert.equal(paymentConfigured({...env,PAYMENTS_ENABLED:"true",PAYMENTS_MODE:"owner_test"}),true);
+ assert.equal(paymentConfigured({...env,PAYMENTS_ENABLED:"true",PAYMENTS_MODE:"live"}),false);
+ assert.equal(paymentConfigured({...env,PAYMENTS_ENABLED:"true",PAYMENTS_MODE:"owner_test",RAZORPAY_KEY_ID:"rzp_live_real123"}),false);
 });
 test("Calendar-month renewals handle February",()=>{
  assert.equal(new Date(calendarMonths(Date.parse("2024-01-31T08:00:00Z"),1)*1000).toISOString(),"2024-02-29T08:00:00.000Z");

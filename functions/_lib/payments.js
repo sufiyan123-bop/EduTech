@@ -1,5 +1,24 @@
 import {fail,verifyHmac} from "./core.js";
-export function paymentConfigured(env){return Boolean(env.RAZORPAY_KEY_ID&&env.RAZORPAY_KEY_SECRET&&env.RAZORPAY_WEBHOOK_SECRET&&env.PAYMENTS_ENABLED==="true");}
+// Test payments must never be open to arbitrary students. A separate explicit
+// mode is required even if the global PAYMENTS_ENABLED switch is flipped.
+export function ownerTestMode(env){return env.PAYMENTS_MODE==="owner_test";}
+export function paymentConfigured(env){
+ const keys=Boolean(env.RAZORPAY_KEY_ID&&env.RAZORPAY_KEY_SECRET&&env.RAZORPAY_WEBHOOK_SECRET);
+ if(!keys||env.PAYMENTS_ENABLED!=="true")return false;
+ if(ownerTestMode(env))return /^rzp_test_[A-Za-z0-9]+$/.test(env.RAZORPAY_KEY_ID);
+ // A future switch to live keys cannot silently turn on real billing.
+ if(env.PAYMENTS_MODE==="live"&&env.LIVE_PAYMENTS_APPROVED==="true")
+  return /^rzp_live_[A-Za-z0-9]+$/.test(env.RAZORPAY_KEY_ID);
+ return false;
+}
+export function canUseCheckout(env,user){
+ if(!paymentConfigured(env))return false;
+ if(ownerTestMode(env))return Boolean(user?.staffActive===1&&user?.role==="owner");
+ return true;
+}
+export function requireCheckoutPermission(env,user){
+ if(!canUseCheckout(env,user))fail(403,ownerTestMode(env)?"Dummy checkout is currently restricted to the academy owner.":"Checkout is not enabled for this account.");
+}
 export async function razorpay(env,method,path,body){
  if(!paymentConfigured(env))fail(503,"Payments are not configured");
  const r=await fetch("https://api.razorpay.com/v1"+path,{
@@ -19,6 +38,10 @@ export async function captureAndEnroll(env,payment,expectedOrderId){
  if(!payment||payment.order_id!==expectedOrderId||payment.status!=="captured"||payment.currency!=="INR")fail(422,"Payment has not been captured");
  const order=await env.DB.prepare("SELECT * FROM payment_orders WHERE razorpay_order_id=?").bind(expectedOrderId).first();
  if(!order)fail(404,"Payment order not recognized");
+ if(ownerTestMode(env)){
+  const owner=await env.DB.prepare("SELECT role,active FROM staff WHERE user_id=?").bind(order.user_id).first();
+  if(owner?.role!=="owner"||owner?.active!==1)fail(403,"Only the academy owner can receive dummy checkout access");
+ }
  if(Number(payment.amount)!==order.amount_paise)fail(422,"Payment amount mismatch");
  if(order.state==="paid"){
   if(order.razorpay_payment_id!==payment.id)fail(409,"Order already paid by another payment");
