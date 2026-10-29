@@ -1,9 +1,10 @@
 import {requireUser,checkOrigin,bodyJson,fail,json,errorResponse} from "../../_lib/core.js";
-import {razorpay,paymentConfigured} from "../../_lib/payments.js";
+import {razorpay,paymentConfigured,requireCheckoutPermission} from "../../_lib/payments.js";
 export async function onRequestPost(ctx){
  try{
   checkOrigin(ctx.request);const user=await requireUser(ctx);
   if(!paymentConfigured(ctx.env))fail(503,"Payments are not configured");
+  requireCheckoutPermission(ctx.env,user);
   const body=await bodyJson(ctx.request),id=String(body.courseId||""),months=Number(body.months);
   if(![1,3,6,12].includes(months))fail(400,"Invalid plan duration");
   const course=await ctx.env.DB.prepare("SELECT id,title,status,published,details_json FROM courses WHERE id=?").bind(id).first();
