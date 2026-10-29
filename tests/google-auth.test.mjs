@@ -4,18 +4,19 @@ import { verifyGoogleIdentity } from "../functions/_lib/google.js";
 
 const clientId="111111111111-exampleclient.apps.googleusercontent.com";
 const originFetch=globalThis.fetch;
+let testKeyCounter=0;
 const now=()=>Math.floor(Date.now()/1000);
 const b64=x=>Buffer.from(typeof x==="string"?x:JSON.stringify(x)).toString("base64url");
 
 async function signingSetup(){
  const keys=await crypto.subtle.generateKey({name:"RSASSA-PKCS1-v1_5",modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:"SHA-256"},true,["sign","verify"]);
  const jwk=await crypto.subtle.exportKey("jwk",keys.publicKey);
- jwk.kid="key-one";jwk.alg="RS256";jwk.use="sig";
+ const kid="key-"+(++testKeyCounter);jwk.kid=kid;jwk.alg="RS256";jwk.use="sig";
  globalThis.fetch=async url=>{
    assert.equal(url,"https://www.googleapis.com/oauth2/v3/certs");
    return Response.json({keys:[jwk]},{headers:{"Cache-Control":"public, max-age=600"}});
  };
- async function sign(payload, header={kid:"key-one",alg:"RS256",typ:"JWT"}){
+ async function sign(payload, header={kid,alg:"RS256",typ:"JWT"}){
   const signingInput=b64(header)+"."+b64(payload);
   const signature=await crypto.subtle.sign("RSASSA-PKCS1-v1_5",keys.privateKey,new TextEncoder().encode(signingInput));
   return signingInput+"."+Buffer.from(signature).toString("base64url");
