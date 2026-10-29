@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Cloudflare Email Login Test | InfraRivet Academy</title>
+  <style>
+    :root {font-family: system-ui, sans-serif; color:#14213d; background:#eef4fa}
+    *{box-sizing:border-box} body{margin:0;padding:40px 16px}
+    main{max-width:470px;margin:auto;background:#fff;border:1px solid #d7e1ea;border-radius:18px;padding:32px;box-shadow:0 16px 32px #14213d12}
+    h1{font-size:26px;margin:0 0 14px}p{line-height:1.5;color:#536579}
+    .note{font-size:13px;background:#f1f7ff;padding:12px;border-radius:9px}
+    label{display:block;font-weight:650;font-size:14px;margin:18px 0 8px}
+    input{width:100%;padding:13px 12px;border:1px solid #aebdca;border-radius:9px;font-size:16px}
+    button{width:100%;padding:13px 14px;background:#1d4ed8;color:white;border:0;border-radius:9px;font-weight:750;cursor:pointer;margin-top:16px}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    button.secondary{background:#eef4ff;color:#1d4ed8}
+    .status{padding:12px;margin:16px 0;border-radius:9px;background:#f3f6fa;font-size:14px;white-space:pre-wrap}
+    .status.error{color:#9f1239;background:#fff1f2}
+    .status.success{color:#065f46;background:#ecfdf5}
+    [hidden]{display:none!important}
+  </style>
+</head>
+<body>
+<main>
+  <h1>InfraRivet Academy</h1>
+  <p>Cloudflare + Resend student email sign-in test</p>
+  <p class="note">Staging-only check. With Resend's onboarding sender, use the email address registered with your Resend account. This does not migrate the existing Firebase course/admin pages.</p>
+  <form id="request-form">
+    <label for="email">Your email</label>
+    <input id="email" type="email" autocomplete="email" required maxlength="254" placeholder="you@example.com">
+    <label>Security check</label>
+    <div id="turnstile"></div>
+    <button id="send" type="submit" disabled>Send six-digit code</button>
+  </form>
+  <form id="verify-form" hidden>
+    <label for="code">Six-digit code</label>
+    <input id="code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required>
+    <button id="verify" type="submit">Verify code and sign in</button>
+    <button class="secondary" type="button" id="again">Request another code</button>
+  </form>
+  <section id="signed-in" hidden>
+    <p class="status success" id="identity"></p>
+    <button id="logout" type="button">Sign out</button>
+  </section>
+  <p id="status" class="status" role="status" aria-live="polite">Loading Cloudflare Turnstile…</p>
+</main>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  let captchaToken = "";
+  let widgetId = null;
+  let activeEmail = "";
+  const status = (message, kind = "") => {
+    $("status").textContent = message;
+    $("status").className = "status " + kind;
+  };
+  async function api(url, method = "GET", body) {
+    const r = await fetch(url, {
+      method,
+      credentials: "same-origin",
+      headers: body ? { "Content-Type": "application/json" } : {},
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.message || "Request failed (" + r.status + ")");
+    return data;
+  }
+  function clearCaptcha() {
+    captchaToken = "";
+    $("send").disabled = true;
+    if (widgetId !== null && window.turnstile) window.turnstile.reset(widgetId);
+  }
+  async function load() {
+    try {
+      const config = await api("/api/auth/config");
+      const waitForTurnstile = () => new Promise((resolve, reject) => {
+        let count = 0;
+        const poll = () => {
+          if (window.turnstile?.render) return resolve();
+          if (++count > 80) return reject(new Error("Turnstile script did not load."));
+          setTimeout(poll, 100);
+        };
+        poll();
+      });
+      await waitForTurnstile();
+      widgetId = window.turnstile.render("#turnstile", {
+        sitekey: config.turnstileSiteKey,
+        callback(token) { captchaToken = token; $("send").disabled = !token; status("Security check complete.", "success"); },
+        "expired-callback"() { captchaToken = ""; $("send").disabled = true; status("Security check expired. Please retry."); },
+        "error-callback"() { captchaToken = ""; $("send").disabled = true; status("Security check failed. Please retry.", "error"); }
+      });
+      status("Complete the security check to request your code.");
+      const existing = await api("/api/auth/me");
+      if (existing.user) showUser(existing.user);
+    } catch (error) { status(error.message, "error"); }
+  }
+  function showUser(user) {
+    $("request-form").hidden = true;
+    $("verify-form").hidden = true;
+    $("signed-in").hidden = false;
+    $("identity").textContent = "Authenticated: " + user.email;
+    status("Secure Cloudflare session verified.", "success");
+  }
+  $("request-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const email = $("email").value.trim().toLowerCase();
+    if (!captchaToken) return status("Complete the security check first.", "error");
+    $("send").disabled = true;
+    status("Sending your email code…");
+    try {
+      await api("/api/auth/request-code", "POST", { email, turnstileToken: captchaToken });
+      activeEmail = email;
+      $("request-form").hidden = true;
+      $("verify-form").hidden = false;
+      $("code").focus();
+      status("Code sent. Check your email; it expires in 10 minutes.", "success");
+    } catch (error) {
+      status(error.message, "error");
+    } finally { clearCaptcha(); }
+  });
+  $("verify-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    $("verify").disabled = true;
+    status("Verifying your code…");
+    try {
+      const result = await api("/api/auth/verify-code", "POST", { email: activeEmail, code: $("code").value.trim() });
+      showUser(result.user);
+    } catch (error) { status(error.message, "error"); }
+    finally { $("verify").disabled = false; }
+  });
+  $("again").addEventListener("click", () => {
+    $("verify-form").hidden = true;
+    $("request-form").hidden = false;
+    $("code").value = "";
+    clearCaptcha();
+    status("Complete a new security check before requesting another code.");
+  });
+  $("logout").addEventListener("click", async () => {
+    try {
+      await api("/api/auth/logout", "POST");
+      $("signed-in").hidden = true;
+      $("request-form").hidden = false;
+      clearCaptcha();
+      status("You are signed out.", "success");
+    } catch (error) { status(error.message, "error"); }
+  });
+  load();
+})();
+</script>
+</body>
+</html>
