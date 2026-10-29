@@ -1,9 +1,10 @@
 import {requireUser,checkOrigin,bodyJson,verifyHmac,fail,json,errorResponse} from "../../_lib/core.js";
-import {razorpay,paymentConfigured,captureAndEnroll} from "../../_lib/payments.js";
+import {razorpay,paymentConfigured,captureAndEnroll,requireCheckoutPermission} from "../../_lib/payments.js";
 export async function onRequestPost(ctx){
  try{
   checkOrigin(ctx.request);const user=await requireUser(ctx);
   if(!paymentConfigured(ctx.env))fail(503,"Payments not configured");
+  requireCheckoutPermission(ctx.env,user);
   const d=await bodyJson(ctx.request),orderId=String(d.razorpay_order_id||""),paymentId=String(d.razorpay_payment_id||"");
   if(!/^order_[\w-]+$/.test(orderId)||!/^pay_[\w-]+$/.test(paymentId))fail(400,"Invalid payment identifiers");
   if(!await verifyHmac(ctx.env.RAZORPAY_KEY_SECRET,orderId+"|"+paymentId,d.razorpay_signature))fail(403,"Payment signature invalid");
