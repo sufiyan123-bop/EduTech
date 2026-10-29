@@ -1,7 +1,7 @@
 // Shared Cloudflare Pages Functions helpers. No Firebase dependencies.
 export class HttpError extends Error { constructor(status, message){super(message);this.status=status;} }
 export function fail(status,message){throw new HttpError(status,message);}
-export function json(data,status=200,headers={}){return Response.json(data,{status,headers:{"Cache-Control":"no-store",...headers}});}
+export function json(data,status=200,headers={}){return Response.json(data,{status,headers:{"Cache-Control":"no-store","X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer","Cross-Origin-Resource-Policy":"same-origin","X-Frame-Options":"DENY",...headers}});}
 export function errorResponse(e){if(!(e instanceof HttpError))console.error("InfraRivet Academy API error",e);return json({error:e instanceof HttpError?e.message:"Service temporarily unavailable" },e instanceof HttpError?e.status:503);}
 export async function bodyJson(request,limit=20000){
  const size=Number(request.headers.get("content-length")||0);
