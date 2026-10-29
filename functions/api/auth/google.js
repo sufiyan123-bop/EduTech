@@ -26,6 +26,15 @@ export async function onRequestPost(ctx) {
       linked=await ctx.env.DB.prepare("SELECT user_id FROM google_identities WHERE google_sub=?").bind(identity.sub).first();
       if (linked?.user_id!==userId) fail(409,"Google account is already linked differently");
     }
+    // Grant owner only after Google's signed ID token proves this exact Gmail address.
+    // No frontend-provided role or unverified email can grant administrative access.
+    const designatedOwner = String(ctx.env.OWNER_EMAIL || "").trim().toLowerCase();
+    if (designatedOwner && identity.email === designatedOwner) {
+      await ctx.env.DB.prepare(
+        "INSERT INTO staff (user_id, role, permissions_json, active) VALUES (?, 'owner', '[\"*\"]', 1) " +
+        "ON CONFLICT(user_id) DO UPDATE SET role='owner', permissions_json='[\"*\"]', active=1"
+      ).bind(userId).run();
+    }
     const token=randomToken(),now=Math.floor(Date.now()/1000),maxAge=60*60*24*14;
     await ctx.env.DB.prepare("INSERT INTO sessions(token_hash,user_id,expires_at) VALUES (?,?,?)")
       .bind(await sha256(token),userId,now+maxAge).run();
