@@ -1,4 +1,5 @@
 import {requireUser,requireStaff,checkOrigin,bodyJson,sanitizeCourseBody,json,fail,errorResponse} from "../../../_lib/core.js";
+import {assertNoYoutubeWhenPaywalled} from "../../../_lib/video.js";
 export async function onRequestPut(ctx){
  try{
   checkOrigin(ctx.request);const user=await requireUser(ctx);requireStaff(user,"courses.manage");
@@ -18,6 +19,7 @@ export async function onRequestPut(ctx){
    const childParents=await ctx.env.DB.prepare("SELECT parent_course_id FROM course_inclusions WHERE parent_course_id IN ("+d.included.map(()=>"?").join(",")+")").bind(...d.included).all();
    if((childParents.results||[]).length)fail(409,"Nested bundles are not supported");
   }
+  await assertNoYoutubeWhenPaywalled(ctx.env,id,d.included,d.price);
   const statements=[
    ctx.env.DB.prepare(`UPDATE courses SET title=?,description=?,track=?,price_inr=?,thumbnail=?,published=?,status=?,featured=?,sort_order=?,details_json=?,updated_at=unixepoch() WHERE id=?`).bind(d.title,d.description,d.track,d.price,d.thumbnail,d.published,d.status,d.featured,d.homeOrder,JSON.stringify(d.details),id),
    ctx.env.DB.prepare("DELETE FROM course_inclusions WHERE parent_course_id=?").bind(id),
