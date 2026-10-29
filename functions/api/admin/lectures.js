@@ -1,4 +1,5 @@
 import {requireUser,requireStaff,checkOrigin,bodyJson,json,fail,errorResponse} from "../../_lib/core.js";
+import {assertYoutubeSafeForCourse} from "../../_lib/video.js";
 const clean=d=>{
  const title=String(d.title||"").trim().slice(0,220);if(!title)fail(400,"Lecture title is required");
  const raw=String(d.youtubeId||"").trim(),r2=String(d.r2ObjectKey||"").trim();
@@ -27,7 +28,8 @@ export async function onRequestPost(ctx){
  try{
   checkOrigin(ctx.request);const u=await requireUser(ctx);requireStaff(u,"lectures.manage");
   const body=await bodyJson(ctx.request);const courseId=String(body.courseId||""),d=clean(body);
-  const course=await ctx.env.DB.prepare("SELECT id FROM courses WHERE id=?").bind(courseId).first();if(!course)fail(404,"Course not found");
+  const course=await ctx.env.DB.prepare("SELECT id,price_inr FROM courses WHERE id=?").bind(courseId).first();if(!course)fail(404,"Course not found");
+  await assertYoutubeSafeForCourse(ctx.env,courseId,d.youtube,course.price_inr);
   const id=crypto.randomUUID();
   await ctx.env.DB.prepare(`INSERT INTO lectures(id,course_id,title,chapter,sort_order,trial_enabled,free_preview,youtube_id,r2_object_key)
     VALUES(?,?,?,?,?,?,?,?,?)`).bind(id,courseId,d.title,d.chapter,d.order,d.trial,d.preview,d.youtube||null,d.r2||null).run();
@@ -38,6 +40,9 @@ export async function onRequestPut(ctx){
  try{
   checkOrigin(ctx.request);const u=await requireUser(ctx);requireStaff(u,"lectures.manage");
   const body=await bodyJson(ctx.request),id=String(body.id||""),courseId=String(body.courseId||""),d=clean(body);
+  const course=await ctx.env.DB.prepare("SELECT id,price_inr FROM courses WHERE id=?").bind(courseId).first();
+  if(!course)fail(404,"Course not found");
+  await assertYoutubeSafeForCourse(ctx.env,courseId,d.youtube,course.price_inr);
   const result=await ctx.env.DB.prepare(`UPDATE lectures SET title=?,chapter=?,sort_order=?,trial_enabled=?,free_preview=?,youtube_id=?,r2_object_key=?
     WHERE id=? AND course_id=?`).bind(d.title,d.chapter,d.order,d.trial,d.preview,d.youtube||null,d.r2||null,id,courseId).run();
   if(!result.meta?.changes)fail(404,"Lecture not found");return json({saved:true});
