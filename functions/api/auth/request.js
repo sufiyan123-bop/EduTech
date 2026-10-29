@@ -15,7 +15,10 @@ export async function onRequestPost(ctx){
   const now=Math.floor(Date.now()/1000),previous=await env.DB.prepare("SELECT * FROM email_challenges WHERE email=?").bind(email).first();
   if(previous&&now-previous.last_sent_at<60)fail(429,"Please wait one minute before requesting another code");
   if(previous&&now-previous.window_start<3600&&previous.sent_count>=5)fail(429,"Too many codes requested. Try again later");
-  const code=String(crypto.getRandomValues(new Uint32Array(1))[0]%1000000).padStart(6,"0");
+  // Uniform six-digit OTP via rejection sampling (no modulo bias).
+  const sample=new Uint32Array(1),limit=Math.floor(0x100000000/1000000)*1000000;
+  do{crypto.getRandomValues(sample)}while(sample[0]>=limit);
+  const code=String(sample[0]%1000000).padStart(6,"0");
   const codeHash=await hmacHex(env.OTP_HASH_SECRET,email+":"+code);
   await env.DB.prepare(`INSERT INTO email_challenges
    (email,code_hash,expires_at,last_sent_at,sent_count,window_start,failed_attempts)
@@ -31,6 +34,8 @@ export async function onRequestPost(ctx){
   if(!response.ok){
    await env.DB.prepare("DELETE FROM email_challenges WHERE email=? AND code_hash=?").bind(email,codeHash).run();
    console.error("Email provider failure",response.status);
+   if(response.status===403)fail(503,"Email provider rejected this recipient or sender. The Resend testing sender only sends to your registered email; other students need an approved sending domain.");
+   if(response.status===401)fail(503,"Email provider rejected the API key. Check Resend credentials.");
    fail(503,"Could not send your code. Try again later");
   }
   return json({sent:true,message:"Check your inbox for a 6-digit sign-in code."});
