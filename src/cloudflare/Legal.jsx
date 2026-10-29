@@ -38,7 +38,7 @@ export function PrivacyPolicy(){
   <section><h2>3. How we use information</h2><ul>
    <li>Create and authenticate student accounts, including Google Sign-In.</li>
    <li>Deliver courses, manage enrollments, and remember lesson progress.</li>
-   <li>Protect accounts, prevent abuse, and maintain the reliability of the service.</li>
+   <li>Protect accounts, prevent abuse, and maintain the reliability of the service. The classroom player may visibly watermark video playback with your signed-in account email to discourage unauthorized recording and sharing.</li>
    <li>Respond to support, privacy, and account-deletion requests.</li>
    <li>Meet legal obligations and investigate security issues when required.</li>
   </ul><p>We do not sell your personal information to advertisers.</p></section>
