@@ -12,8 +12,8 @@ function parseJson(part) {
   catch { fail(401, "Invalid Google sign-in token"); }
 }
 let cached = { until: 0, keys: [] };
-async function publicKeys() {
-  if (Date.now() < cached.until && cached.keys.length) return cached.keys;
+async function publicKeys(force = false) {
+  if (!force && Date.now() < cached.until && cached.keys.length) return cached.keys;
   let res;
   try { res = await fetch("https://www.googleapis.com/oauth2/v3/certs", {headers: {"Accept":"application/json"}}); }
   catch { fail(503, "Google sign-in verification is temporarily unavailable"); }
@@ -33,8 +33,9 @@ export async function verifyGoogleIdentity(credential, clientId) {
   if (parts.length!==3) fail(401, "Invalid Google sign-in token");
   const header=parseJson(parts[0]);
   if (header.alg!=="RS256" || typeof header.kid!=="string" || !header.kid || header.crit) fail(401, "Invalid Google sign-in token");
-  const keys=await publicKeys();
-  const jwk=keys.find(k=>k.kid===header.kid);
+  let keys=await publicKeys();
+  let jwk=keys.find(k=>k.kid===header.kid);
+  if (!jwk) { keys=await publicKeys(true); jwk=keys.find(k=>k.kid===header.kid); }
   if (!jwk) fail(401, "Google sign-in token key is not recognized");
   let valid=false;
   try {
