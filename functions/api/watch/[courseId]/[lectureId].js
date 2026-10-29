@@ -1,4 +1,5 @@
 import {requireUser,getLessonAccess,json,fail,errorResponse} from "../../../_lib/core.js";
+import {assertYoutubeSafeForCourse} from "../../../_lib/video.js";
 export async function onRequestGet(ctx){
  try{
   const user=await requireUser(ctx),courseId=String(ctx.params.courseId||""),lectureId=String(ctx.params.lectureId||"");
@@ -7,7 +8,10 @@ export async function onRequestGet(ctx){
    if(!ctx.env.VIDEOS)fail(503,"Private video storage is not configured");
    return json({provider:"r2",url:"/api/stream/"+encodeURIComponent(courseId)+"/"+encodeURIComponent(lectureId)});
   }
-  if(lesson.youtube_id&&/^[\w-]{11}$/.test(lesson.youtube_id))return json({provider:"youtube",youtubeId:lesson.youtube_id});
+  if(lesson.youtube_id&&/^[\w-]{11}$/.test(lesson.youtube_id)){
+   await assertYoutubeSafeForCourse(ctx.env,courseId,lesson.youtube_id,lesson.price_inr);
+   return json({provider:"youtube",youtubeId:lesson.youtube_id});
+  }
   fail(404,"Video is not uploaded yet");
  }catch(e){return errorResponse(e)}
 }
