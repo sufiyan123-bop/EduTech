@@ -51,3 +51,13 @@ The endpoints use: server-side Turnstile verification, six-digit 10-minute OTPs,
 - Turnstile verification failed (400): ensure the browser passes the Turnstile response as `turnstileToken` and that the corresponding `TURNSTILE_SECRET` is configured.
 
 No API keys or OTPs should be logged, committed or shared.
+
+## 6. Isolated no-Firebase smoke test
+
+The migration branch also includes `public/cloudflare-otp-test.html` and `GET /api/auth/config`. Once a **preview deployment of this branch** is created and its Preview secrets plus D1 binding are configured, open `https://YOUR-PREVIEW.pages.dev/cloudflare-otp-test.html` to test Turnstile → Resend email delivery → one-time verification → session cookie → sign-out. It does not depend on the old Firebase frontend or migrate Firebase-backed student/admin features.
+
+With `RESEND_FROM_EMAIL=onboarding@resend.dev`, **test only with the email address registered on the Resend account**. An unrelated student's email requires a verified custom sender domain.
+
+The public site key must be available at runtime to Pages Functions as `VITE_TURNSTILE_SITE_KEY` or `TURNSTILE_SITE_KEY`; do not confuse this with the secret `TURNSTILE_SECRET`.
+
+**Never merge or deploy to production merely to test.** Run the isolated test on a preview deployment. The production frontend still needs migration, and preview environment variables may differ from production.
