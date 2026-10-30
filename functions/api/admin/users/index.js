@@ -22,7 +22,7 @@ export async function onRequestGet(ctx){
   const sort=String(params.get("sort")||"newest");
   const page=Math.min(100000,Math.max(1,Number.parseInt(params.get("page"),10)||1));
   const size=Math.min(50,Math.max(1,Number.parseInt(params.get("size"),10)||20));
-  const conditions=[],args=[];
+  const conditions=["u.auth_provider <> 'deleted'"],args=[];
   if(search){conditions.push("(instr(lower(u.email),lower(?))>0 OR instr(lower(u.display_name),lower(?))>0)");args.push(search,search)}
   const f=userFilter(filter);if(f)conditions.push(f);
   const where=conditions.length?" WHERE "+conditions.join(" AND "):"";
@@ -46,11 +46,14 @@ export async function onRequestGet(ctx){
      FROM users u LEFT JOIN staff st ON st.user_id=u.id
      ${where} ORDER BY ${order} LIMIT ? OFFSET ?`).bind(...args,size,(page-1)*size).all(),
    ctx.env.DB.prepare(`SELECT
-     (SELECT COUNT(*) FROM users) AS total,
-     (SELECT COUNT(*) FROM users WHERE trial_expires_at>unixepoch()) AS activeTrials,
-     (SELECT COUNT(DISTINCT user_id) FROM enrollments WHERE expires_at IS NULL OR expires_at>unixepoch()) AS activeLearners,
-     (SELECT COUNT(*) FROM staff WHERE active=1) AS teamMembers,
-     (SELECT COUNT(DISTINCT user_id) FROM payment_orders WHERE state='paid') AS payingLearners
+     (SELECT COUNT(*) FROM users WHERE auth_provider <> 'deleted') AS total,
+     (SELECT COUNT(*) FROM users WHERE auth_provider <> 'deleted' AND trial_expires_at>unixepoch()) AS activeTrials,
+     (SELECT COUNT(DISTINCT e.user_id) FROM enrollments e JOIN users u2 ON u2.id=e.user_id
+      WHERE u2.auth_provider <> 'deleted' AND (e.expires_at IS NULL OR e.expires_at>unixepoch())) AS activeLearners,
+     (SELECT COUNT(*) FROM staff s JOIN users u2 ON u2.id=s.user_id
+      WHERE s.active=1 AND u2.auth_provider <> 'deleted') AS teamMembers,
+     (SELECT COUNT(DISTINCT p.user_id) FROM payment_orders p JOIN users u2 ON u2.id=p.user_id
+      WHERE p.state='paid' AND u2.auth_provider <> 'deleted') AS payingLearners
    `).first()
   ]);
   return json({users:list.results||[],total:count?.n||0,page,size,summary},
