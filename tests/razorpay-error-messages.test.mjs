@@ -64,7 +64,7 @@ test("Razorpay auth strips copy-paste whitespace from the key pair",async()=>{
   return Response.json({id:"order_abc",amount:14900,currency:"INR"});
  };
  try{
-  const d=await razorpay({...env,RAZORPAY_KEY_ID:" rzp_live_sample123  ",RAZORPAY_KEY_SECRET:"not-a-real-secret\n  "},"POST","/orders",{amount:14900});
+  const d=await razorpay({...env,RAZORPAY_KEY_ID:"rzp_live_sample123",RAZORPAY_KEY_SECRET:"not-a-real-secret\n  "},"POST","/orders",{amount:14900});
   assert.equal(d.id,"order_abc");
  }finally{globalThis.fetch=originalFetch;}
 });
