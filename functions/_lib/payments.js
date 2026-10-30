@@ -25,7 +25,23 @@ export async function razorpay(env,method,path,body){
   method,headers:{"Authorization":"Basic "+btoa(env.RAZORPAY_KEY_ID+":"+env.RAZORPAY_KEY_SECRET),"Content-Type":"application/json"},
   body:body?JSON.stringify(body):undefined
  });
- if(!r.ok){console.error("Razorpay failed",r.status);fail(503,"Payment provider is temporarily unavailable")}
+ if(!r.ok){
+  // Razorpay can reject a Live order for reasons other than an API key
+  // mismatch (merchant permissions, activation, invalid order fields, etc).
+  // Never log credentials or reveal the payment API response wholesale.
+  const payload=await r.json().catch(()=>null);
+  const apiError=payload?.error;
+  const code=typeof apiError?.code==="string"?apiError.code.slice(0,50):"unknown";
+  const reason=typeof apiError?.reason==="string"?apiError.reason.slice(0,80):"unknown";
+  console.error("Razorpay request failed",{status:r.status,code,reason,operation:method+" "+path.replace(/\/payments\/[^/]+$/,"/payments/:id")});
+  if(method==="POST"&&path==="/orders"&&r.status>=400&&r.status<500){
+   const message=typeof apiError?.description==="string"
+    ?apiError.description.replace(/[\r\n\t]/g," ").replace(/https?:\/\/\S+/gi,"[link]").replace(/rzp_(?:live|test)_[A-Za-z0-9]+/g,"[key]").replace(/[A-Za-z0-9_\-]{40,}/g,"[redacted]").trim().slice(0,170)
+    :"";
+   fail(503,"Razorpay rejected this live order (HTTP "+r.status+")"+(message?": "+message:". Contact Razorpay support with the HTTP status."));
+  }
+  fail(503,"Razorpay is unavailable (HTTP "+r.status+"). Please try again or contact support.");
+ }
  return r.json();
 }
 export function calendarMonths(start,months){
