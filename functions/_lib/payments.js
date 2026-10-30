@@ -33,10 +33,10 @@ export async function razorpay(env,method,path,body){
   const apiError=payload?.error;
   const code=typeof apiError?.code==="string"?apiError.code.slice(0,50):"unknown";
   const reason=typeof apiError?.reason==="string"?apiError.reason.slice(0,80):"unknown";
-  console.error("Razorpay request failed",{status:r.status,code,reason,operation:method+" "+path.replace(/\\/payments\\/[^/]+$/,"/payments/:id")});
+  console.error("Razorpay request failed",{status:r.status,code,reason,operation:method+" "+path.replace(/\/payments\/[^/]+$/,"/payments/:id")});
   if(method==="POST"&&path==="/orders"&&r.status>=400&&r.status<500){
    const message=typeof apiError?.description==="string"
-    ?apiError.description.replace(/[\\r\\n\\t]/g," ").replace(/https?:\\/\\/\\S+/gi,"[link]").replace(/rzp_(?:live|test)_[A-Za-z0-9]+/g,"[key]").replace(/[A-Za-z0-9_\\-]{40,}/g,"[redacted]").trim().slice(0,170)
+    ?apiError.description.replace(/[\r\n\t]/g," ").replace(/https?:\/\/\S+/gi,"[link]").replace(/rzp_(?:live|test)_[A-Za-z0-9]+/g,"[key]").replace(/[A-Za-z0-9_\-]{40,}/g,"[redacted]").trim().slice(0,170)
     :"";
    fail(503,"Razorpay rejected this live order (HTTP "+r.status+")"+(message?": "+message:". Contact Razorpay support with the HTTP status."));
   }
