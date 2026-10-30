@@ -12,7 +12,7 @@ export async function onRequestPost(ctx){
   await ctx.env.DB.prepare("UPDATE email_challenges SET failed_attempts=failed_attempts+1 WHERE email=?").bind(email).run();
   if(!await verifyHmac(ctx.env.OTP_HASH_SECRET,email+":"+code,challenge.code_hash))fail(400,"Incorrect verification code");
   await ctx.env.DB.prepare("DELETE FROM email_challenges WHERE email=?").bind(email).run();
-  const previous=await ctx.env.DB.prepare("SELECT id,email,display_name FROM users WHERE email=? COLLATE NOCASE").bind(email).first();
+  const previous=await ctx.env.DB.prepare("SELECT id,email,display_name,auth_provider FROM users WHERE email=? COLLATE NOCASE").bind(email).first();
   let userId=previous?.id;
   if(!userId){
    userId=crypto.randomUUID();
@@ -21,6 +21,10 @@ export async function onRequestPost(ctx){
    const existing=await ctx.env.DB.prepare("SELECT id FROM users WHERE email=? COLLATE NOCASE").bind(email).first();
    userId=existing.id;
   }
+  // The account may have been pre-created for an owner-approved admin invite.
+  // Mark it verified only after the correct email OTP has been checked.
+  if(previous?.auth_provider==="pending_otp")
+   await ctx.env.DB.prepare("UPDATE users SET auth_provider='email_otp' WHERE id=? AND auth_provider='pending_otp'").bind(userId).run();
   const token=randomToken(),hash=await sha256(token);
   await ctx.env.DB.prepare("INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)").bind(hash,userId,now+60*60*24*14).run();
   return json({signedIn:true},200,{"Set-Cookie":sessionCookie(ctx.request,token,60*60*24*14)});
