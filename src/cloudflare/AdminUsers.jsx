@@ -143,7 +143,7 @@ export default function AdminUsers({courses=[],onGrantAdmin=()=>{}}){
     </div>
     <div className="flex flex-wrap items-center gap-2">
      <button onClick={()=>openUser(u.id)} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white"><Edit3 size={14}/> View / edit</button>
-     {u.role!=="owner"&&<button onClick={()=>onGrantAdmin(u)} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-50"><ShieldAlert size={14}/> {u.staffActive===1?"Admin permissions":"Make admin"}</button>}
+     {onGrantAdmin&&u.role!=="owner"&&<button onClick={()=>onGrantAdmin(u)} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-50"><ShieldAlert size={14}/> {u.staffActive===1?"Admin permissions":"Make admin"}</button>}
      <button onClick={()=>beginDelete(u)} disabled={busy||u.role==="owner"||u.staffActive===1}
       title={u.role==="owner"?"Owner accounts cannot be deleted":u.staffActive===1?"Remove active staff permissions first":"Delete this user"}
       className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">
