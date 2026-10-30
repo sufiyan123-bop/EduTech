@@ -18,7 +18,7 @@ function mock({actorRole="owner",actorActive=1,existing=true,targetRole=null,
       first:async()=>{
        if(sql.includes("FROM sessions s JOIN users u"))return {id:"owner-1",email:"owner@example.com",role:actorRole,staffActive:actorActive,permissionsJson:"[]"};
        if(sql.includes("FROM users u LEFT JOIN staff s")&&sql.includes("u.email=?"))return target;
-       if(sql.includes("FROM staff s JOIN users u"))return target?{id:target.id,email:target.email,role:targetRole,active:1}:null;
+       if(sql.includes("FROM staff s JOIN users u"))return target&&values[0]===target.id?{id:target.id,email:target.email,role:targetRole,active:1}:null;
        if(sql.includes("SELECT u.email,s.role FROM users u"))return target?{email:target.email,role:target.role}:null;
        return null;
       },
