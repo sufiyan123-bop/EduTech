@@ -3,7 +3,7 @@ import {requireUser,checkOrigin,bodyJson,validateEmail,json,fail,errorResponse} 
 // Only the owner can assign or remove administrative privileges. The delegated
 // "staff" role never receives owner privileges or permission to manage staff.
 export const STAFF_PERMISSIONS=Object.freeze([
- "courses.view","courses.manage","lectures.manage","enrollments.manage"
+ "courses.view","courses.manage","lectures.manage","enrollments.manage","users.manage"
 ]);
 
 function requireOwner(user){
