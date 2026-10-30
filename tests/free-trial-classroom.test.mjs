@@ -25,7 +25,7 @@ function context({signedIn=true,published=1,status="available"}={}){
       return {results:[{
        id:isChild?"folder-trial":"root-trial",title:"Try this",trialEnabled:1,freePreview:0,
        completed:0,price:isChild?0:3500,published:isChild?0:published,
-       details_json:isChild?'{"folderOnly":true}':"{}",status:"available",order:1
+       details_json:isChild?'{"folderOnly":true}':"{}",status:isChild?"available":status,order:1
       },{
        id:isChild?"folder-paid":"root-paid",title:"Paid video",trialEnabled:0,freePreview:0,
        completed:0,price:isChild?0:3500,published:isChild?0:published,
