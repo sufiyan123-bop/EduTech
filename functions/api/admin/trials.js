@@ -1,9 +1,10 @@
-import {requireUser,requireStaff,checkOrigin,bodyJson,validateEmail,fail,json,errorResponse} from "../../_lib/core.js";
+import {requireUser,requireStaff,checkOrigin,bodyJson,validateEmail,protectOwnerAccount,fail,json,errorResponse} from "../../_lib/core.js";
 export async function onRequestPost(ctx){
  try{
   checkOrigin(ctx.request);
   const admin=await requireUser(ctx);requireStaff(admin,"enrollments.manage");
   const d=await bodyJson(ctx.request),email=validateEmail(d.email);
+  await protectOwnerAccount(ctx.env,admin,{email});
   const days=Number(d.days);
   if(!Number.isInteger(days)||days<1||days>30)fail(400,"Choose 1–30 trial days");
   let student=await ctx.env.DB.prepare("SELECT id FROM users WHERE email=? COLLATE NOCASE").bind(email).first();

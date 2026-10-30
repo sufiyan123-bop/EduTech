@@ -1,5 +1,5 @@
 import {requireUser,checkOrigin,bodyJson,fail,json,errorResponse} from "../../../_lib/core.js";
-import {requireOwner} from "./index.js";
+import {requireUserManager,ensureManagedTarget} from "./index.js";
 
 function userId(ctx){
  const id=String(ctx.params.id||"");
@@ -8,8 +8,9 @@ function userId(ctx){
 }
 export async function onRequestGet(ctx){
  try{
-  const owner=await requireUser(ctx);requireOwner(owner);
+  const owner=await requireUser(ctx);requireUserManager(owner);
   const id=userId(ctx);
+  await ensureManagedTarget(ctx,owner,id);
   const [profile,access,payments,activity]=await Promise.all([
    ctx.env.DB.prepare(`SELECT u.id,u.email,u.display_name AS displayName,
     u.auth_provider AS authProvider,u.created_at AS createdAt,
@@ -38,8 +39,9 @@ export async function onRequestGet(ctx){
 export async function onRequestPut(ctx){
  try{
   checkOrigin(ctx.request);
-  const owner=await requireUser(ctx);requireOwner(owner);
+  const owner=await requireUser(ctx);requireUserManager(owner);
   const id=userId(ctx),body=await bodyJson(ctx.request);
+  await ensureManagedTarget(ctx,owner,id);
   const keys=Object.keys(body);
   if(!keys.length||keys.some(k=>!["displayName","trialExpiresAt"].includes(k)))
    fail(400,"Only display name and trial expiry can be edited");
@@ -72,9 +74,10 @@ export async function onRequestPut(ctx){
 export async function onRequestDelete(ctx){
  try{
   checkOrigin(ctx.request);
-  const owner=await requireUser(ctx);requireOwner(owner);
+  const owner=await requireUser(ctx);requireUserManager(owner);
   const id=userId(ctx);
-  if(id===owner.id)fail(403,"You cannot delete your own owner account");
+  if(id===owner.id)fail(403,"You cannot delete your own account");
+  await ensureManagedTarget(ctx,owner,id);
   const body=await bodyJson(ctx.request);
   if(Object.keys(body).length!==1||typeof body.confirmEmail!=="string")
    fail(400,"Confirm the user's email address to delete this account");

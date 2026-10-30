@@ -1,4 +1,4 @@
-import {requireUser,requireStaff,checkOrigin,bodyJson,validateEmail,asTime,json,fail,errorResponse} from "../../_lib/core.js";
+import {requireUser,requireStaff,checkOrigin,bodyJson,validateEmail,asTime,protectOwnerAccount,json,fail,errorResponse} from "../../_lib/core.js";
 export async function onRequestGet(ctx){
  try{
   const u=await requireUser(ctx);requireStaff(u,"enrollments.manage");
@@ -13,6 +13,7 @@ export async function onRequestPost(ctx){
  try{
   checkOrigin(ctx.request);const u=await requireUser(ctx);requireStaff(u,"enrollments.manage");
   const d=await bodyJson(ctx.request),email=validateEmail(d.email),courseId=String(d.courseId||""),expires=asTime(d.expiresAt);
+  await protectOwnerAccount(ctx.env,u,{email});
   if(d.expiresAt&&!expires)fail(400,"Invalid expiry date");
   if(expires&&expires<=Math.floor(Date.now()/1000))fail(400,"Expiry must be in the future");
   const course=await ctx.env.DB.prepare("SELECT id FROM courses WHERE id=?").bind(courseId).first();
@@ -31,6 +32,7 @@ export async function onRequestDelete(ctx){
  try{
   checkOrigin(ctx.request);const u=await requireUser(ctx);requireStaff(u,"enrollments.manage");
   const d=await bodyJson(ctx.request);
+  await protectOwnerAccount(ctx.env,u,{userId:String(d.userId||"")});
   await ctx.env.DB.prepare("DELETE FROM enrollments WHERE user_id=? AND course_id=?").bind(String(d.userId||""),String(d.courseId||"")).run();
   return json({revoked:true});
  }catch(e){return errorResponse(e)}

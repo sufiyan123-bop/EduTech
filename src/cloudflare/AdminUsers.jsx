@@ -30,7 +30,7 @@ function downloadCsv(rows){
 function Stat({label,value}){
  return <div className="rounded-xl border bg-white p-4"><p className="text-xs text-slate-500">{label}</p><strong className="mt-1 block text-xl text-slate-900">{value??"—"}</strong></div>;
 }
-export default function AdminUsers({courses=[]}){
+export default function AdminUsers({courses=[],onGrantAdmin=()=>{}}){
  const [query,setQuery]=useState(""),[search,setSearch]=useState(""),[filter,setFilter]=useState("all"),[sort,setSort]=useState("newest"),[page,setPage]=useState(1);
  const [list,setList]=useState([]),[total,setTotal]=useState(0),[summary,setSummary]=useState(null);
  const [selected,setSelected]=useState(""),[detail,setDetail]=useState(null),[name,setName]=useState(""),[expires,setExpires]=useState("");
@@ -143,6 +143,7 @@ export default function AdminUsers({courses=[]}){
     </div>
     <div className="flex flex-wrap items-center gap-2">
      <button onClick={()=>openUser(u.id)} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white"><Edit3 size={14}/> View / edit</button>
+     {onGrantAdmin&&u.role!=="owner"&&<button onClick={()=>onGrantAdmin(u)} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-50"><ShieldAlert size={14}/> {u.staffActive===1?"Admin permissions":"Make admin"}</button>}
      <button onClick={()=>beginDelete(u)} disabled={busy||u.role==="owner"||u.staffActive===1}
       title={u.role==="owner"?"Owner accounts cannot be deleted":u.staffActive===1?"Remove active staff permissions first":"Delete this user"}
       className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">

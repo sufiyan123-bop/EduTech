@@ -1,8 +1,22 @@
-import {requireUser,fail,json,errorResponse} from "../../../_lib/core.js";
+import {requireUser,requireStaff,fail,json,errorResponse} from "../../../_lib/core.js";
 
-// Only the active academy owner may list personal student information.
-export function requireOwner(user){
- if(user?.role!=="owner"||user.staffActive!==1)fail(403,"Only the academy owner can manage users");
+// Owner or explicitly delegated student-management administrators only.
+export function requireUserManager(user){requireStaff(user,"users.manage")}
+
+// Delegates cannot view, edit, delete or revoke sessions for the owner or
+// another active admin, even if the caller guesses an account ID.
+export async function ensureManagedTarget(ctx,actor,id){
+ const target=await ctx.env.DB.prepare(`SELECT u.id,u.email,
+  COALESCE(s.role,'student') AS role,COALESCE(s.active,0) AS staffActive
+  FROM users u LEFT JOIN staff s ON s.user_id=u.id
+  WHERE u.id=? AND u.auth_provider <> 'deleted'`).bind(id).first();
+ if(!target?.id)fail(404,"User not found");
+ const protectedEmail=String(ctx.env.OWNER_EMAIL||"").trim().toLowerCase();
+ if(actor.role!=="owner"&&
+  (target.role==="owner"||target.staffActive===1||
+    protectedEmail&&target.email.toLowerCase()===protectedEmail))
+  fail(403,"Only the owner can manage owner or admin accounts");
+ return target;
 }
 
 function userFilter(filter){
@@ -15,7 +29,7 @@ function userFilter(filter){
 }
 export async function onRequestGet(ctx){
  try{
-  const current=await requireUser(ctx);requireOwner(current);
+  const current=await requireUser(ctx);requireUserManager(current);
   const params=new URL(ctx.request.url).searchParams;
   const search=String(params.get("q")||"").trim().slice(0,100);
   const filter=String(params.get("filter")||"all");
@@ -23,6 +37,11 @@ export async function onRequestGet(ctx){
   const page=Math.min(100000,Math.max(1,Number.parseInt(params.get("page"),10)||1));
   const size=Math.min(50,Math.max(1,Number.parseInt(params.get("size"),10)||20));
   const conditions=["u.auth_provider <> 'deleted'"],args=[];
+  if(current.role!=="owner"){
+   conditions.push("NOT EXISTS (SELECT 1 FROM staff st2 WHERE st2.user_id=u.id AND (st2.role='owner' OR st2.active=1))");
+   const designated=String(ctx.env.OWNER_EMAIL||"").trim();
+   if(designated){conditions.push("u.email <> ? COLLATE NOCASE");args.push(designated)}
+  }
   if(search){conditions.push("(instr(lower(u.email),lower(?))>0 OR instr(lower(u.display_name),lower(?))>0)");args.push(search,search)}
   const f=userFilter(filter);if(f)conditions.push(f);
   const where=conditions.length?" WHERE "+conditions.join(" AND "):"";
