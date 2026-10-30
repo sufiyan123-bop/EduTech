@@ -56,3 +56,15 @@ test("Successful order API response remains unchanged",async()=>{
  try{assert.deepEqual(await razorpay(env,"POST","/orders",{amount:14900}),order);}
  finally{globalThis.fetch=originalFetch;}
 });
+
+test("Razorpay auth strips copy-paste whitespace from the key pair",async()=>{
+ globalThis.fetch=async(_url,opts)=>{
+  const basic=opts.headers.Authorization.slice("Basic ".length);
+  assert.equal(Buffer.from(basic,"base64").toString("utf8"),"rzp_live_sample123:not-a-real-secret");
+  return Response.json({id:"order_abc",amount:14900,currency:"INR"});
+ };
+ try{
+  const d=await razorpay({...env,RAZORPAY_KEY_ID:" rzp_live_sample123  ",RAZORPAY_KEY_SECRET:"not-a-real-secret\n  "},"POST","/orders",{amount:14900});
+  assert.equal(d.id,"order_abc");
+ }finally{globalThis.fetch=originalFetch;}
+});
