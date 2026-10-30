@@ -10,7 +10,7 @@ export async function ensureManagedTarget(ctx,actor,id){
   COALESCE(s.role,'student') AS role,COALESCE(s.active,0) AS staffActive
   FROM users u LEFT JOIN staff s ON s.user_id=u.id
   WHERE u.id=? AND u.auth_provider <> 'deleted'`).bind(id).first();
- if(!target)fail(404,"User not found");
+ if(!target?.id)fail(404,"User not found");
  const protectedEmail=String(ctx.env.OWNER_EMAIL||"").trim().toLowerCase();
  if(actor.role!=="owner"&&
   (target.role==="owner"||target.staffActive===1||
