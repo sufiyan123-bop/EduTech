@@ -20,6 +20,9 @@ export async function onRequestPost(ctx) {
       }
       if (!u) fail(503,"Could not create Google account");
       userId=u.id;
+      // Only a verified Google ID token can activate an invited account.
+      if(u.auth_provider==="pending_otp")
+       await ctx.env.DB.prepare("UPDATE users SET auth_provider='google_oidc' WHERE id=? AND auth_provider='pending_otp'").bind(userId).run();
       // Unique user_id constraint prevents linking multiple Google subjects to one account.
       await ctx.env.DB.prepare("INSERT INTO google_identities (google_sub,user_id,email) VALUES (?,?,?) ON CONFLICT(google_sub) DO NOTHING")
         .bind(identity.sub,userId,identity.email).run();
