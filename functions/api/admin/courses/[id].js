@@ -1,9 +1,11 @@
 import {requireUser,requireStaff,checkOrigin,bodyJson,sanitizeCourseBody,json,fail,errorResponse} from "../../../_lib/core.js";
 import {assertNoYoutubeWhenPaywalled} from "../../../_lib/video.js";
+import {resolveThumbnailUrl} from "../../../_lib/thumbnail.js";
 export async function onRequestPut(ctx){
  try{
   checkOrigin(ctx.request);const user=await requireUser(ctx);requireStaff(user,"courses.manage");
   const id=String(ctx.params.id||""),d=sanitizeCourseBody(await bodyJson(ctx.request,50000));
+  d.thumbnail=await resolveThumbnailUrl(d.thumbnail);
   const old=await ctx.env.DB.prepare("SELECT id FROM courses WHERE id=?").bind(id).first();
   if(!old)fail(404,"Course not found");
   if(d.included.includes(id))fail(400,"Course cannot include itself");
