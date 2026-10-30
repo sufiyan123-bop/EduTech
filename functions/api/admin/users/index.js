@@ -1,4 +1,4 @@
-import {requireUser,fail,json,errorResponse} from "../../_lib/core.js";
+import {requireUser,fail,json,errorResponse} from "../../../_lib/core.js";
 
 // Only the active academy owner may list personal student information.
 export function requireOwner(user){
