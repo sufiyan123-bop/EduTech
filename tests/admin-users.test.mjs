@@ -1,14 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {onRequestGet as listUsers} from "../functions/api/admin/users/index.js";
-import {onRequestGet as userDetail,onRequestPut as updateUser} from "../functions/api/admin/users/[id].js";
+import {onRequestGet as userDetail,onRequestPut as updateUser,onRequestDelete as deleteUser} from "../functions/api/admin/users/[id].js";
 import {onRequestDelete as revokeSessions} from "../functions/api/admin/users/[id]/sessions.js";
 
 const cookie="a".repeat(64);
 const base="https://infrarivet.pages.dev";
-function mock({role="owner",active=1,userId="owner-1"}={}){
- const statements=[],runs=[];
- const env={DB:{prepare(sql){
+function mock({role="owner",active=1,userId="owner-1",targetRole="student",targetActive=0,paymentOrders=0,exists=true}={}){
+ const statements=[],runs=[],batches=[];
+ const env={DB:{
+  async batch(operations){batches.push(operations);for(const operation of operations)await operation.run();return [];},
+  prepare(sql){
   statements.push(sql);
   return {first:async()=>({total:2,activeTrials:1,activeLearners:1,teamMembers:1,payingLearners:1}),bind(...values){
    return {
@@ -17,6 +19,8 @@ function mock({role="owner",active=1,userId="owner-1"}={}){
      if(sql.includes("COUNT(*) AS n FROM users"))return {n:2};
      if(sql.includes("(SELECT COUNT(*) FROM users) AS total"))return {total:2,activeTrials:1,activeLearners:1,teamMembers:1,payingLearners:1};
      if(sql.includes("SELECT id FROM users WHERE id=?"))return {id:values[0]};
+     if(sql.includes("SELECT u.id,u.email")&&sql.includes("AS paymentOrders"))
+      return exists?{id:values[0],email:"student@example.com",role:targetRole,staffActive:targetActive,paymentOrders}:null;
      if(sql.includes("SELECT u.id,st.role FROM users"))return {id:values[0],role:"student"};
      if(sql.includes("SELECT u.id,u.email,u.display_name"))return {id:values[0],email:"student@example.com",displayName:"Student",role:"student"};
      if(sql.includes("AS activeSessions"))return {activeSessions:2,completedLessons:3};
@@ -32,7 +36,7 @@ function mock({role="owner",active=1,userId="owner-1"}={}){
    };
   }};
  }}};
- return {env,statements,runs};
+ return {env,statements,runs,batches};
 }
 function context(m,path,{method="GET",body,session=true}={}){
  return {env:m.env,params:{id:"student-1"},request:new Request(base+path,{
@@ -98,4 +102,80 @@ test("Sensitive user details remain owner-only",async()=>{
  const m=mock({role:"staff"});
  const r=await userDetail(context(m,"/api/admin/users/student-1"));
  assert.equal(r.status,403);
+});
+
+test("Owner can delete a user without payment history in an atomic batch",async()=>{
+ const m=mock();
+ const response=await deleteUser(context(m,"/api/admin/users/student-1",{
+  method:"DELETE",body:{confirmEmail:"student@example.com"}
+ }));
+ assert.equal(response.status,200);
+ assert.deepEqual(await response.json(),{deleted:true,retainedPaymentRecords:false});
+ assert.equal(m.batches.length,1);
+ const sql=m.runs.map(x=>x.sql).join("\n");
+ for(const table of ["sessions","google_identities","lesson_progress","enrollments","staff","email_challenges","users"])
+  assert.match(sql,new RegExp("DELETE FROM "+table));
+ assert.equal(m.runs.some(x=>x.sql.includes("UPDATE users")),false);
+});
+test("Payment history is never removed; account is anonymized instead",async()=>{
+ const m=mock({paymentOrders:2});
+ const response=await deleteUser(context(m,"/api/admin/users/student-1",{
+  method:"DELETE",body:{confirmEmail:" STUDENT@EXAMPLE.COM "}
+ }));
+ assert.equal(response.status,200);
+ assert.equal((await response.json()).retainedPaymentRecords,true);
+ assert.equal(m.runs.some(x=>x.sql.includes("DELETE FROM users WHERE")),false);
+ assert.equal(m.runs.some(x=>x.sql.includes("DELETE FROM payment_orders")),false);
+ const update=m.runs.find(x=>x.sql.includes("UPDATE users"));
+ assert.ok(update);
+ assert.match(update.values[0],/^deleted-[0-9a-f-]+@accounts\.invalid$/);
+ assert.equal(update.values[1],"student-1");
+ assert.match(update.sql,/auth_provider='deleted'/);
+});
+test("Deletion requires verified exact-email confirmation and same-site origin",async()=>{
+ const m=mock();
+ const wrong=await deleteUser(context(m,"/api/admin/users/student-1",{
+  method:"DELETE",body:{confirmEmail:"other@example.com"}
+ }));
+ assert.equal(wrong.status,400);
+ const badContext=context(m,"/api/admin/users/student-1",{
+  method:"DELETE",body:{confirmEmail:"student@example.com"}
+ });
+ badContext.request=new Request(base+"/api/admin/users/student-1",{
+  method:"DELETE",headers:{Cookie:"infrarivet_session="+cookie,Origin:"https://evil.test","Content-Type":"application/json"},
+  body:JSON.stringify({confirmEmail:"student@example.com"})
+ });
+ assert.equal((await deleteUser(badContext)).status,403);
+ assert.equal(m.batches.length,0);
+});
+test("Only owner can delete; self, other owner and active team accounts are protected",async()=>{
+ const staff=mock({role:"staff"});
+ assert.equal((await deleteUser(context(staff,"/api/admin/users/student-1",{
+  method:"DELETE",body:{confirmEmail:"student@example.com"}
+ }))).status,403);
+ const owner=mock();
+ const selfContext=context(owner,"/api/admin/users/owner-1",{
+  method:"DELETE",body:{confirmEmail:"student@example.com"}
+ });selfContext.params.id="owner-1";
+ assert.equal((await deleteUser(selfContext)).status,403);
+ const otherOwner=mock({targetRole:"owner"});
+ assert.equal((await deleteUser(context(otherOwner,"/api/admin/users/student-1",{
+  method:"DELETE",body:{confirmEmail:"student@example.com"}
+ }))).status,403);
+ const activeStaff=mock({targetRole:"staff",targetActive:1});
+ assert.equal((await deleteUser(context(activeStaff,"/api/admin/users/student-1",{
+  method:"DELETE",body:{confirmEmail:"student@example.com"}
+ }))).status,409);
+ for(const m of [staff,owner,otherOwner,activeStaff])assert.equal(m.batches.length,0);
+});
+test("Deleted and unknown users are not returned by admin endpoints",async()=>{
+ const m=mock({exists:false});
+ const r=await deleteUser(context(m,"/api/admin/users/student-1",{
+  method:"DELETE",body:{confirmEmail:"student@example.com"}
+ }));
+ assert.equal(r.status,404);
+ assert.equal(m.batches.length,0);
+ const listed=await listUsers(context(m,"/api/admin/users"));
+ assert.equal(listed.status,200);
+ assert.equal(m.statements.some(sql=>sql.includes("u.auth_provider <> 'deleted'")),true);
 });
