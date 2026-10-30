@@ -56,7 +56,7 @@ export function requireStaff(user,permission){
  if(!user?.staffActive)fail(403,"Administrator access required");
  if(user.role==="owner")return;
  const perms=JSON.parse(user.permissionsJson||"[]");
- if(permission==="courses.view"&&perms.some(p=>["courses.manage","lectures.manage","enrollments.manage"].includes(p)))return;
+ if(permission==="courses.view"&&perms.some(p=>["courses.manage","lectures.manage","enrollments.manage","users.manage"].includes(p)))return;
  if(!perms.includes(permission)&&!perms.includes("*"))fail(403,"Permission denied");
 }
 // Delegated admins may grant student course access, but never modify the
