@@ -2,13 +2,13 @@ import {requireUser,isEnrolled,json,fail,errorResponse} from "../../_lib/core.js
 export async function onRequestGet(ctx){
  try{
   const user=await requireUser(ctx),db=ctx.env.DB,id=String(ctx.params.courseId||"");
-  const root=await db.prepare("SELECT id,title,description,thumbnail,track,published FROM courses WHERE id=?").bind(id).first();
+  const root=await db.prepare("SELECT id,title,description,thumbnail,track,published,status FROM courses WHERE id=?").bind(id).first();
   if(!root)fail(404,"Course not found");
   if(!root.published&&!await isEnrolled(ctx.env,user.id,id))fail(404,"Course not found");
   const children=await db.prepare(`SELECT c.id,c.title,c.description,c.thumbnail,c.track,c.published
    FROM course_inclusions i JOIN courses c ON c.id=i.child_course_id
    WHERE i.parent_course_id=? ORDER BY i.sort_order,c.title`).bind(id).all();
-  const modules=[root,...(children.results||[])],now=Math.floor(Date.now()/1000);
+  const modules=[root,...(children.results||[])];
   const assembled=await Promise.all(modules.map(async c=>{
    const [progress,paid]=await Promise.all([
     db.prepare(`SELECT l.id,l.title,l.chapter,l.sort_order AS "order",l.trial_enabled AS trialEnabled,
@@ -22,7 +22,7 @@ export async function onRequestGet(ctx){
    return {...c,lessons:(progress.results||[]).map(l=>{
     const folderOnly=Boolean(JSON.parse(l.details_json||"{}").folderOnly);
     const free=Boolean(l.published&&Number(l.price)<=0&&l.freePreview);
-    const trial=Boolean((l.published||folderOnly&&c.id!==id)&&l.status!=="comingSoon"&&user.trialExpiresAt>now&&l.trialEnabled);
+    const trial=Boolean(l.trialEnabled&&l.status!=="comingSoon"&&(l.published||folderOnly&&c.id!==id&&root.published&&root.status!=="comingSoon"));
     return {id:l.id,title:l.title,chapter:l.chapter||"General",order:l.order,trialEnabled:Boolean(l.trialEnabled),
      completed:Boolean(l.completed),locked:!(admin||paid||free||trial)};
    }),unlocked:admin||paid};
