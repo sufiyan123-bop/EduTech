@@ -6,7 +6,7 @@ import {onRequestDelete as revokeSessions} from "../functions/api/admin/users/[i
 
 const cookie="a".repeat(64);
 const base="https://infrarivet.pages.dev";
-function mock({role="owner",active=1,userId="owner-1",targetRole="student",targetActive=0,paymentOrders=0,exists=true}={}){
+function mock({role="owner",active=1,userId="owner-1",targetRole="student",targetActive=0,paymentOrders=0,exists=true,permissions=[]}={}){
  const statements=[],runs=[],batches=[];
  const env={DB:{
   async batch(operations){batches.push(operations);for(const operation of operations)await operation.run();return [];},
@@ -15,10 +15,12 @@ function mock({role="owner",active=1,userId="owner-1",targetRole="student",targe
   return {first:async()=>({total:2,activeTrials:1,activeLearners:1,teamMembers:1,payingLearners:1}),bind(...values){
    return {
     first:async()=>{
-     if(sql.includes("FROM sessions s JOIN users u"))return {id:userId,email:"owner@example.com",role,staffActive:active,permissionsJson:"[]"};
+     if(sql.includes("FROM sessions s JOIN users u"))return {id:userId,email:"owner@example.com",role,staffActive:active,permissionsJson:JSON.stringify(permissions)};
      if(sql.includes("COUNT(*) AS n FROM users"))return {n:2};
      if(sql.includes("(SELECT COUNT(*) FROM users) AS total"))return {total:2,activeTrials:1,activeLearners:1,teamMembers:1,payingLearners:1};
      if(sql.includes("SELECT id FROM users WHERE id=?"))return {id:values[0]};
+     if(sql.includes("WHERE u.id=? AND u.auth_provider <> 'deleted'")&&sql.includes("COALESCE(s.active,0) AS staffActive"))
+      return exists?{id:values[0],email:"student@example.com",role:targetRole,staffActive:targetActive}:null;
      if(sql.includes("SELECT u.id,u.email")&&sql.includes("AS paymentOrders"))
       return exists?{id:values[0],email:"student@example.com",role:targetRole,staffActive:targetActive,paymentOrders}:null;
      if(sql.includes("SELECT u.id,st.role FROM users"))return {id:values[0],role:"student"};
@@ -178,4 +180,32 @@ test("Deleted and unknown users are not returned by admin endpoints",async()=>{
  const listed=await listUsers(context(m,"/api/admin/users"));
  assert.equal(listed.status,200);
  assert.equal(m.statements.some(sql=>sql.includes("u.auth_provider <> 'deleted'")),true);
+});
+
+test("Delegated student managers may manage ordinary users, but not the owner or admins",async()=>{
+ const staff=mock({role:"staff",permissions:["users.manage"]});
+ const listed=await listUsers(context(staff,"/api/admin/users"));
+ assert.equal(listed.status,200);
+ assert.equal(staff.statements.some(sql=>sql.includes("NOT EXISTS (SELECT 1 FROM staff st2")),true);
+ const update=await updateUser(context(staff,"/api/admin/users/student-1",{
+  method:"PUT",body:{displayName:"Changed by admin"}
+ }));
+ assert.equal(update.status,200);
+ const removed=await deleteUser(context(staff,"/api/admin/users/student-1",{
+  method:"DELETE",body:{confirmEmail:"student@example.com"}
+ }));
+ assert.equal(removed.status,200);
+ const ownerTarget=mock({role:"staff",permissions:["users.manage"],targetRole:"owner"});
+ const blocked=await updateUser(context(ownerTarget,"/api/admin/users/student-1",{
+  method:"PUT",body:{displayName:"Not allowed"}
+ }));
+ assert.equal(blocked.status,403);
+ assert.equal((await deleteUser(context(ownerTarget,"/api/admin/users/student-1",{
+  method:"DELETE",body:{confirmEmail:"student@example.com"}
+ }))).status,403);
+ const adminTarget=mock({role:"staff",permissions:["users.manage"],targetRole:"staff",targetActive:1});
+ assert.equal((await updateUser(context(adminTarget,"/api/admin/users/student-1",{
+  method:"PUT",body:{trialExpiresAt:null}
+ }))).status,403);
+ assert.equal(adminTarget.runs.length,0);
 });
