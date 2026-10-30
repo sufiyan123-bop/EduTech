@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useState} from "react";
 import {api,formatPrice,readableDate} from "./api.js";
-import {Download,Edit3,Search,ShieldAlert,UserRound,Users,RefreshCw,ArrowLeft,CheckCircle2,BookOpen} from "lucide-react";
+import {Download,Edit3,Search,ShieldAlert,UserRound,Users,RefreshCw,ArrowLeft,CheckCircle2,BookOpen,Trash2} from "lucide-react";
 
 const field="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-blue-600";
 const button="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50";
@@ -37,6 +37,7 @@ export default function AdminUsers({courses=[]}){
  const [courseId,setCourseId]=useState(""),[courseExpiry,setCourseExpiry]=useState("");
  const [error,setError]=useState(""),[message,setMessage]=useState(""),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[reload,setReload]=useState(0);
  const [exporting,setExporting]=useState(false);
+ const [deleteTarget,setDeleteTarget]=useState(null),[confirmEmail,setConfirmEmail]=useState(""),[deleteError,setDeleteError]=useState("");
  const size=20;
  const loadDetail=useCallback(async id=>{
   const data=await api("/api/admin/users/"+encodeURIComponent(id));
@@ -62,6 +63,25 @@ export default function AdminUsers({courses=[]}){
    if(selected)await loadDetail(selected);
    setReload(v=>v+1);setMessage(success);
   }catch(e){setError(e.message)}finally{setBusy(false)}
+ }
+ function beginDelete(u){
+  setDeleteTarget({id:u.id,email:u.email,displayName:u.displayName||u.email});
+  setConfirmEmail("");setDeleteError("");setError("");setMessage("");
+ }
+ async function deleteAccount(){
+  if(!deleteTarget||busy||confirmEmail.trim().toLowerCase()!==deleteTarget.email.toLowerCase())return;
+  setBusy(true);setDeleteError("");
+  try{
+   const result=await api("/api/admin/users/"+encodeURIComponent(deleteTarget.id),{
+    method:"DELETE",body:{confirmEmail}
+   });
+   if(selected===deleteTarget.id){setSelected("");setDetail(null)}
+   setDeleteTarget(null);setConfirmEmail("");
+   setReload(v=>v+1);
+   setMessage(result.retainedPaymentRecords
+    ?"User account removed. Payment records were retained without the user's personal profile."
+    :"User account and access deleted successfully.");
+  }catch(e){setDeleteError(e.message)}finally{setBusy(false)}
  }
  function submitSearch(e){e.preventDefault();setPage(1);setSearch(query.trim())}
  async function exportAll(){
@@ -121,7 +141,14 @@ export default function AdminUsers({courses=[]}){
       <p className="mt-1 text-xs text-slate-500">{u.role} · {u.activeCourses} active courses · Joined {readableDate(u.createdAt)}{u.paidOrders>0?" · "+u.paidOrders+" paid order(s)":""}</p>
      </div>
     </div>
-    <button onClick={()=>openUser(u.id)} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white"><Edit3 size={14}/> View / edit</button>
+    <div className="flex flex-wrap items-center gap-2">
+     <button onClick={()=>openUser(u.id)} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white"><Edit3 size={14}/> View / edit</button>
+     <button onClick={()=>beginDelete(u)} disabled={busy||u.role==="owner"||u.staffActive===1}
+      title={u.role==="owner"?"Owner accounts cannot be deleted":u.staffActive===1?"Remove active staff permissions first":"Delete this user"}
+      className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">
+      <Trash2 size={14}/> Delete
+     </button>
+    </div>
    </div>)}
    {!loading&&list.length===0&&<p className="py-8 text-center text-sm text-slate-500">No users found. Try another search or filter.</p>}</div>
    <div className="mt-4 flex items-center justify-between gap-3">
@@ -173,10 +200,39 @@ export default function AdminUsers({courses=[]}){
       {!detail.payments.length&&<p className="py-3 text-sm text-slate-500">No payments recorded</p>}</div>
       <div className="mt-5 border-t pt-4"><h4 className="flex items-center gap-2 text-sm font-extrabold"><ShieldAlert size={17}/> Account security</h4><p className="mt-2 text-xs text-slate-600">Last session: {fmt(detail.activity?.lastSessionAt)}. Sign out all other sessions without deleting user data.</p>
        <button disabled={busy||detail.user.role==="owner"} onClick={()=>{if(window.confirm("Sign out all sessions for "+detail.user.email+"?"))mutation(()=>api("/api/admin/users/"+encodeURIComponent(selected)+"/sessions",{method:"DELETE"}),"All user sessions revoked")}} className="mt-3 rounded-xl border border-amber-300 px-4 py-2.5 text-xs font-bold text-amber-900 disabled:opacity-40">Revoke all sessions</button>
+       <div className="mt-5 border-t border-red-100 pt-4">
+        <h4 className="flex items-center gap-2 text-sm font-extrabold text-red-800"><Trash2 size={16}/> Delete account</h4>
+        <p className="mt-2 text-xs text-slate-600">Remove this user's profile, sessions, course access and learning progress. Historical payment records are retained without their personal profile.</p>
+        <button disabled={busy||detail.user.role==="owner"||detail.user.staffActive===1}
+         onClick={()=>beginDelete(detail.user)}
+         className="mt-3 rounded-xl border border-red-300 px-4 py-2.5 text-xs font-bold text-red-800 hover:bg-red-50 disabled:opacity-40">
+         Delete user
+        </button>
+        {detail.user.staffActive===1&&detail.user.role!=="owner"&&<p className="mt-2 text-xs text-amber-800">Remove this user from the active admin team first.</p>}
+       </div>
       </div>
      </section>
     </div>
    </>}
   </section>}
+  {deleteTarget&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4">
+   <section role="dialog" aria-modal="true" aria-labelledby="delete-user-heading"
+    className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+    <h3 id="delete-user-heading" className="flex items-center gap-2 text-xl font-extrabold text-red-800"><ShieldAlert size={22}/> Delete user account?</h3>
+    <p className="mt-3 break-words text-sm text-slate-700">You are about to remove <strong>{deleteTarget.displayName}</strong> ({deleteTarget.email}).</p>
+    <p className="mt-3 text-sm text-slate-700">This action cannot be undone. The user will be signed out, lose course access, and their learning progress will be removed. If payment orders exist, required financial records are retained under an anonymized account.</p>
+    <label className="mt-5 block text-sm font-semibold text-slate-800">Type <span className="break-all font-extrabold text-red-700">{deleteTarget.email}</span> to confirm
+     <input autoFocus type="email" autoComplete="off" value={confirmEmail} onChange={e=>setConfirmEmail(e.target.value)} className={field} placeholder="Exact user email"/>
+    </label>
+    {deleteError&&<p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">{deleteError}</p>}
+    <div className="mt-6 flex flex-wrap justify-end gap-3">
+     <button disabled={busy} onClick={()=>{setDeleteTarget(null);setDeleteError("");setConfirmEmail("")}} className="rounded-xl border px-4 py-2.5 text-sm font-bold disabled:opacity-40">Cancel</button>
+     <button disabled={busy||confirmEmail.trim().toLowerCase()!==deleteTarget.email.toLowerCase()} onClick={deleteAccount}
+      className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-extrabold text-white disabled:opacity-40">
+      <Trash2 size={16}/>{busy?"Deleting...":"Delete user permanently"}
+     </button>
+    </div>
+   </section>
+  </div>}
  </div>;
 }
