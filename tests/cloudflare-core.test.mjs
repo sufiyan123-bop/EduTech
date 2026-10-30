@@ -50,3 +50,18 @@ test("Published free course still requires a free-preview flag",async()=>{
  await assert.rejects(getLessonAccess(context(lesson),user,"public","lesson"),/requires an active enrollment/);
  assert.deepEqual(await getLessonAccess(context({...lesson,free_preview:1}),user,"public","lesson"),{...lesson,free_preview:1});
 });
+
+test("Any logged-in student can watch explicitly trial-enabled paid course lessons without a grant",async()=>{
+ const lesson={published:1,price_inr:2999,free_preview:0,trial_enabled:1,status:"available",details_json:"{}"};
+ assert.deepEqual(await getLessonAccess(context(lesson),user,"paid","trial-lesson"),lesson);
+ await assert.rejects(getLessonAccess(context({...lesson,trial_enabled:0}),user,"paid","full-lesson"),/requires an active enrollment/);
+});
+test("Signed-in students may watch trial lessons in included private bundle folders",async()=>{
+ const lesson={published:0,price_inr:0,free_preview:0,trial_enabled:1,status:"available",details_json:'{"folderOnly":true}'};
+ assert.deepEqual(await getLessonAccess(context(lesson,{included:true}),user,"bundle-folder","trial-lesson"),lesson);
+ await assert.rejects(getLessonAccess(context(lesson,{included:false}),user,"not-in-published-bundle","trial-lesson"),/Lesson not available/);
+});
+test("Coming-soon lessons stay unavailable even when trial enabled",async()=>{
+ const lesson={published:1,price_inr:2000,free_preview:0,trial_enabled:1,status:"comingSoon",details_json:"{}"};
+ await assert.rejects(getLessonAccess(context(lesson),user,"coming-soon","trial-lesson"),/not available yet/);
+});
