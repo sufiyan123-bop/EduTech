@@ -1,4 +1,5 @@
 import {requireUser,requireStaff,checkOrigin,bodyJson,sanitizeCourseBody,json,fail,errorResponse} from "../../_lib/core.js";
+import {resolveThumbnailUrl} from "../../_lib/thumbnail.js";
 function present(c){const d=JSON.parse(c.details_json||"{}");return {
  id:c.id,title:c.title,description:c.description,track:c.track,price:c.price_inr,
  thumbnail:c.thumbnail,published:Boolean(c.published),status:c.status,featured:Boolean(c.featured),
@@ -18,6 +19,7 @@ export async function onRequestPost(ctx){
  try{
   checkOrigin(ctx.request);const user=await requireUser(ctx);requireStaff(user,"courses.manage");
   const d=sanitizeCourseBody(await bodyJson(ctx.request,50000));
+  d.thumbnail=await resolveThumbnailUrl(d.thumbnail);
   const id=crypto.randomUUID();if(d.included.length)fail(400,"Create the main course first, then add included courses");
   await ctx.env.DB.prepare(`INSERT INTO courses(id,title,description,track,price_inr,thumbnail,published,status,featured,sort_order,details_json)
    VALUES(?,?,?,?,?,?,?,?,?,?,?)`).bind(id,d.title,d.description,d.track,d.price,d.thumbnail,d.published,d.status,d.featured,d.homeOrder,JSON.stringify(d.details)).run();

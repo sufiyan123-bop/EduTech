@@ -22,7 +22,8 @@ export function requireCheckoutPermission(env,user){
 export async function razorpay(env,method,path,body){
  if(!paymentConfigured(env))fail(503,"Payments are not configured");
  const r=await fetch("https://api.razorpay.com/v1"+path,{
-  method,headers:{"Authorization":"Basic "+btoa(env.RAZORPAY_KEY_ID+":"+env.RAZORPAY_KEY_SECRET),"Content-Type":"application/json"},
+  // Razorpay keys are ASCII; strip accidental whitespace introduced by pasting secrets.
+  method,headers:{"Authorization":"Basic "+btoa(String(env.RAZORPAY_KEY_ID).trim()+":"+String(env.RAZORPAY_KEY_SECRET).trim()),"Content-Type":"application/json"},
   body:body?JSON.stringify(body):undefined
  });
  if(!r.ok){
