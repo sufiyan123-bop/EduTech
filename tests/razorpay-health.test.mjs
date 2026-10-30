@@ -47,10 +47,13 @@ test("Owner sees safe 401 classification without credentials",async()=>{
  }finally{globalThis.fetch=originalFetch;}
 });
 test("Detects accidentally pasted webhook secret as API secret",async()=>{
- const r=await onRequestGet(makeCtx("owner",{
-  RAZORPAY_KEY_SECRET:"same-secret",RAZORPAY_WEBHOOK_SECRET:"same-secret"
- }));
- const d=await r.json();assert.equal(d.apiSecretEqualsWebhookSecret,true);
+ globalThis.fetch=async()=>Response.json({error:{description:"Authentication failed"}},{status:401});
+ try{
+  const r=await onRequestGet(makeCtx("owner",{
+   RAZORPAY_KEY_SECRET:"same-secret",RAZORPAY_WEBHOOK_SECRET:"same-secret"
+  }));
+  const d=await r.json();assert.equal(d.apiSecretEqualsWebhookSecret,true);
+ }finally{globalThis.fetch=originalFetch;}
 });
 test("Staff cannot access credential diagnostics",async()=>{
  let fetched=false;globalThis.fetch=async()=>{fetched=true;throw Error("must not fetch");};
