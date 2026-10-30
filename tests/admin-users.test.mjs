@@ -10,7 +10,7 @@ function mock({role="owner",active=1,userId="owner-1"}={}){
  const statements=[],runs=[];
  const env={DB:{prepare(sql){
   statements.push(sql);
-  return {bind(...values){
+  return {first:async()=>({total:2,activeTrials:1,activeLearners:1,teamMembers:1,payingLearners:1}),bind(...values){
    return {
     first:async()=>{
      if(sql.includes("FROM sessions s JOIN users u"))return {id:userId,email:"owner@example.com",role,staffActive:active,permissionsJson:"[]"};
