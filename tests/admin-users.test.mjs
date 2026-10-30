@@ -19,7 +19,7 @@ function mock({role="owner",active=1,userId="owner-1",targetRole="student",targe
      if(sql.includes("COUNT(*) AS n FROM users"))return {n:2};
      if(sql.includes("(SELECT COUNT(*) FROM users) AS total"))return {total:2,activeTrials:1,activeLearners:1,teamMembers:1,payingLearners:1};
      if(sql.includes("SELECT id FROM users WHERE id=?"))return {id:values[0]};
-     if(sql.includes("WHERE u.id=? AND u.auth_provider <> 'deleted'")&&sql.includes("COALESCE(s.active,0) AS staffActive"))
+     if(sql.includes("WHERE u.id=? AND u.auth_provider <> 'deleted'")&&sql.includes("COALESCE(s.active,0) AS staffActive")&&!sql.includes("AS paymentOrders"))
       return exists?{id:values[0],email:"student@example.com",role:targetRole,staffActive:targetActive}:null;
      if(sql.includes("SELECT u.id,u.email")&&sql.includes("AS paymentOrders"))
       return exists?{id:values[0],email:"student@example.com",role:targetRole,staffActive:targetActive,paymentOrders}:null;
