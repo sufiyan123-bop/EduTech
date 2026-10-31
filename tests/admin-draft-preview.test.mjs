@@ -26,7 +26,7 @@ function context({published=false,signedIn=true,role="owner",active=1,permission
      }
     };
    }};
-  }}}}
+  }}}
  };
 }
 test("An authenticated owner can preview DevOps draft and included syllabus without publishing",async()=>{
