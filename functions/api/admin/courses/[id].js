@@ -17,10 +17,14 @@ export async function onRequestPut(ctx){
   if(d.included.length){
    const all=await ctx.env.DB.prepare("SELECT id FROM courses").all(),ids=new Set((all.results||[]).map(x=>x.id));
    if(d.included.some(x=>!ids.has(x)))fail(400,"An included course does not exist");
-   const conflicts=await ctx.env.DB.prepare(`SELECT parent_course_id,child_course_id FROM course_inclusions
-     WHERE parent_course_id<>? OR child_course_id=?`).bind(id,id).all();
-   if((conflicts.results||[]).some(c=>d.included.includes(c.child_course_id)&&c.parent_course_id!==id))fail(409,"One of these courses already belongs to another bundle");
-   if((conflicts.results||[]).some(c=>c.parent_course_id===id&&d.included.includes(c.child_course_id))){} 
+   // Published standalone courses can be reused in multiple master bundles.
+   // Private course folders are owned by one master and cannot be shared.
+   const shared=await ctx.env.DB.prepare(`SELECT i.child_course_id AS childId,
+      COALESCE(json_extract(c.details_json,'$.folderOnly'),0) AS privateFolder
+      FROM course_inclusions i JOIN courses c ON c.id=i.child_course_id
+      WHERE i.parent_course_id<>?`).bind(id).all();
+   if((shared.results||[]).some(c=>d.included.includes(c.childId)&&Number(c.privateFolder)===1))
+    fail(409,"A private folder already belongs to another master course");
    const nested=await ctx.env.DB.prepare("SELECT parent_course_id FROM course_inclusions WHERE child_course_id=?").bind(id).all();
    if((nested.results||[]).length)fail(409,"An included child course cannot become a master bundle");
    const childParents=await ctx.env.DB.prepare("SELECT parent_course_id FROM course_inclusions WHERE parent_course_id IN ("+d.included.map(()=>"?").join(",")+")").bind(...d.included).all();
