@@ -103,6 +103,23 @@ export function Study(){
  if(authLoading||busy)return <div className="mx-auto max-w-6xl px-5 py-24 text-center text-slate-600">Loading your classroom…</div>;
  if(!user)return <div className="mx-auto max-w-4xl px-5 py-24 text-center"><h1 className="text-3xl font-extrabold">Sign in to learn</h1><Link className="mt-5 inline-block rounded-xl bg-blue-700 px-6 py-3 font-bold text-white" to="/login">Sign in</Link></div>;
  if(error)return <div className="mx-auto max-w-5xl px-5 py-20"><h1 className="text-2xl font-extrabold">Classroom unavailable</h1><p className="mt-2 text-red-700">{error}</p><Link className="mt-4 inline-block text-blue-700 underline" to="/dashboard">Back to dashboard</Link></div>;
+ if(data?.previewOnly)return <div className="min-h-[85vh] bg-[#f4f6fa]">
+  <section className="bg-gradient-to-r from-slate-950 to-blue-950 px-5 py-12 text-white"><div className="mx-auto max-w-5xl">
+   <Link to="/courses" className="inline-flex items-center gap-2 text-sm font-bold text-sky-300"><ArrowLeft size={17}/> All courses</Link>
+   <h1 className="mt-5 text-3xl font-extrabold">{data.course.title}</h1>
+   <p className="mt-2 text-sm text-slate-300">Course folders preview · Lecture details are private</p>
+  </div></section>
+  <main className="mx-auto max-w-5xl px-5 py-10">
+   <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-sm sm:p-8">
+    <LockKeyhole size={28} className="text-blue-700"/><h2 className="mt-3 text-xl font-extrabold">Purchase to unlock the lessons</h2>
+    <p className="mt-2 text-sm leading-7 text-slate-600">Before enrolling, you can see only the folders included in this course. Lecture titles, video lists, lesson counts and learning progress are visible after purchase.</p>
+    <Link to={"/courses/"+encodeURIComponent(courseId)} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-blue-700 px-5 py-3 font-bold text-white">View course & purchase options <ArrowRight size={17}/></Link>
+   </div>
+   {data.modules.length>1&&<section className="mt-8"><h2 className="mb-4 text-lg font-extrabold">Included folders and courses</h2>
+    <div className="grid gap-3 sm:grid-cols-2">{data.modules.slice(1).map(m=><div key={m.id} className="flex items-center gap-3 rounded-2xl border bg-white p-5"><BookOpen className="text-blue-700" size={20}/><strong className="text-sm">{m.title}</strong><LockKeyhole size={15} className="ml-auto text-slate-400"/></div>)}</div>
+   </section>}
+  </main></div>;
+
  return <div className="min-h-[85vh] bg-[#f4f6fa]"><div className="bg-gradient-to-r from-slate-950 to-blue-950 px-5 py-7 text-white"><div className="mx-auto max-w-[1500px]"><Link to="/dashboard" className="inline-flex items-center gap-2 text-xs font-bold text-sky-300"><ArrowLeft size={16}/> My Learning</Link><div className="mt-4 flex flex-wrap items-end justify-between gap-5"><div><p className="text-xs font-extrabold uppercase tracking-widest text-sky-300">Your learning classroom</p><h1 className="mt-2 text-2xl font-extrabold sm:text-3xl">{data?.course.title}</h1><p className="mt-1 text-sm text-slate-300">{data?.modules.length} course modules · {all.length} lessons</p></div><div className="w-full max-w-xs rounded-xl border border-white/15 bg-white/10 p-3"><div className="flex justify-between text-xs font-bold"><span>Your progress</span><span>{done}/{all.length} · {percent}%</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-white/20"><div className="h-full rounded-full bg-emerald-400" style={{width:percent+"%"}}/></div></div></div></div></div>
  <div className="mx-auto grid max-w-[1500px] gap-5 px-4 py-6 lg:grid-cols-[345px_minmax(0,1fr)]">
  <aside className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto"><div className="border-b p-5"><h2 className="text-lg font-extrabold">Course contents</h2><p className="mt-1 text-xs text-slate-500">Choose a course, then a video lesson</p></div><div className="divide-y divide-slate-100">{data.modules.map((module,i)=>{
