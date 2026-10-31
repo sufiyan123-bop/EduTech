@@ -48,19 +48,21 @@ test("Purchased students see all lessons across their master course and included
  assert.equal(data.modules.length,2);
  assert.equal(data.previewOnly,false);
  assert.deepEqual(data.modules.map(m=>m.lessons.map(l=>[l.trialEnabled,l.locked])),[
-  [[true,false],[false,true]],
-  [[true,false],[false,true]]
+  [[true,false],[false,false]],
+  [[true,false],[false,false]]
  ]);
 });
 test("Trial lesson listing still requires login",async()=>{
  assert.equal((await classroom(context({signedIn:false}))).status,401);
 });
-test("Coming-soon parent never exposes its trial lessons or unpublished child trial",async()=>{
- const r=await classroom(context({status:"comingSoon",enrolled:true}));
+test("Coming-soon master does not reveal any trial lesson details to a non-buyer",async()=>{
+ const ctx=context({status:"comingSoon"});
+ const r=await classroom(ctx);
  assert.equal(r.status,200);
  const data=await r.json();
- assert.equal(data.modules[0].lessons[0].locked,true);
- assert.equal(data.modules[1].lessons[0].locked,true);
+ assert.equal(data.previewOnly,true);
+ assert.deepEqual(data.modules.map(m=>m.lessons),[[],[]]);
+ assert.equal(ctx.recorded.some(x=>x.sql.includes("FROM lectures")),false);
 });
 test("Unpublished master is hidden from non-enrolled users",async()=>{
  assert.equal((await classroom(context({published:0}))).status,404);
