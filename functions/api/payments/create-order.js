@@ -11,8 +11,17 @@ export async function onRequestPost(ctx){
   if(!course||!course.published||course.status==="comingSoon")fail(404,"Course not available");
   const details=JSON.parse(course.details_json||"{}");
   if(details.folderOnly)fail(400,"Only the main course can be purchased.");
-  const bundled=await ctx.env.DB.prepare("SELECT 1 AS included FROM course_inclusions WHERE child_course_id=? LIMIT 1").bind(id).first();
-  if(bundled)fail(400,"This course is included with its main course. Purchase the main course instead.");
+  // A standalone published course stays independently purchasable even when
+  // included in DevOps or other master programs; no duplicate videos or orders.
+  // However, prevent charging somebody for a child they already receive from
+  // an active master-course enrollment.
+  const bundleAccess=await ctx.env.DB.prepare(`SELECT p.title AS parentTitle
+    FROM course_inclusions i JOIN enrollments e ON e.course_id=i.parent_course_id
+    JOIN courses p ON p.id=i.parent_course_id
+    WHERE i.child_course_id=? AND e.user_id=?
+      AND (e.expires_at IS NULL OR e.expires_at>unixepoch())
+    LIMIT 1`).bind(id,user.id).first();
+  if(bundleAccess)fail(409,"You already have access through "+bundleAccess.parentTitle+".");
   const existing=await ctx.env.DB.prepare("SELECT source FROM enrollments WHERE user_id=? AND course_id=? AND (expires_at IS NULL OR expires_at>unixepoch())").bind(user.id,id).first();
   if(existing?.source==="admin")fail(409,"You already have access to this course.");
   const plans=details.plans||{};
