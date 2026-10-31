@@ -114,8 +114,9 @@ function masterCtx(included,{shared=[{childId:"python",privateFolder:0}],admin=t
      return {results:[]};
     },
     async run(){runs.push({sql,values});return {meta:{changes:1}}}
-   }};
+   };
   }
+  };
  }};
  DB.batch=async stmts=>{for(const st of stmts)await st.run();return []};
  const request=new Request(origin+"/api/admin/courses/devops",{
