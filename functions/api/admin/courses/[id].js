@@ -6,8 +6,13 @@ export async function onRequestPut(ctx){
   checkOrigin(ctx.request);const user=await requireUser(ctx);requireStaff(user,"courses.manage");
   const id=String(ctx.params.id||""),d=sanitizeCourseBody(await bodyJson(ctx.request,50000));
   d.thumbnail=await resolveThumbnailUrl(d.thumbnail);
-  const old=await ctx.env.DB.prepare("SELECT id FROM courses WHERE id=?").bind(id).first();
+  const old=await ctx.env.DB.prepare("SELECT id,details_json FROM courses WHERE id=?").bind(id).first();
   if(!old)fail(404,"Course not found");
+  if(JSON.parse(old.details_json||"{}").folderOnly===true){
+   // Preserve folder identity even if edited through the generic course API.
+   d.details.folderOnly=true;d.published=0;d.price=0;d.featured=0;
+   if(d.included.length)fail(409,"Private folders cannot include other courses");
+  }
   if(d.included.includes(id))fail(400,"Course cannot include itself");
   if(d.included.length){
    const all=await ctx.env.DB.prepare("SELECT id FROM courses").all(),ids=new Set((all.results||[]).map(x=>x.id));
@@ -35,6 +40,13 @@ export async function onRequestDelete(ctx){
   checkOrigin(ctx.request);const user=await requireUser(ctx);requireStaff(user,"courses.manage");
   const id=String(ctx.params.id||"");
   const dependencies=await ctx.env.DB.prepare("SELECT COUNT(*) AS n FROM enrollments WHERE course_id=?").bind(id).first();
+  const child=await ctx.env.DB.prepare("SELECT details_json FROM courses WHERE id=?").bind(id).first();
+  if(!child)fail(404,"Course not found");
+  if(JSON.parse(child.details_json||"{}").folderOnly===true)
+   fail(409,"Use the folder manager to remove an empty private folder");
+  const included=await ctx.env.DB.prepare("SELECT COUNT(*) AS n FROM course_inclusions WHERE parent_course_id=?").bind(id).first();
+  if(Number(included?.n||0)>0)fail(409,"Remove or detach included folders and courses before deleting the master course");
+
   if(dependencies?.n)fail(409,"Course has student enrollments. Unpublish it instead of deleting.");
   await ctx.env.DB.prepare("DELETE FROM courses WHERE id=?").bind(id).run();
   return json({deleted:true});
