@@ -31,7 +31,7 @@ function state({role="owner",permissions=[],nested=false,existingName=false,less
    }
   }};},
   all:async()=>{
-   if(sql.includes("SELECT c.id,c.title,c.description"))return {results:[...courses.values()].map(c=>({...c,description:"",price:999,featured:0,homeOrder:1}))};
+   if(sql.includes("SELECT c.id,c.title,c.description"))return {results:[...courses.values()].filter(c=>c.published===1&&JSON.parse(c.details_json||"{}").folderOnly!==true).map(c=>({...c,description:"",price:999,featured:0,homeOrder:1}))};
    if(sql.includes("SELECT i.parent_course_id AS parentId"))return {results:inclusions.map(i=>({parentId:i.parent_course_id,id:i.child_course_id,title:courses.get(i.child_course_id)?.title}))};
    return {results:[]};
   }
