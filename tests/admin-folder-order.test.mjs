@@ -62,7 +62,7 @@ test("Owner can put Linux first, Python second; order is persisted without movin
  assert.deepEqual((await response.json()).orderedChildIds,["linux","python","docker"]);
  assert.deepEqual(titles(data),["Linux Deep dive","Python with Linux","Docker"]);
  assert.deepEqual(data.changes.map(c=>c.params),[[0,"devops","linux"],[1,"devops","python"],[2,"devops","docker"]]);
- assert.equal(data.changes.every(c=>c.sql.includes("UPDATE course_inclusions SET sort_order=")),true);
+ assert.equal(data.changes.every(c=>/UPDATE course_inclusions\s+SET sort_order=/.test(c.sql)),true);
  assert.equal(data.changes.some(c=>/UPDATE courses|DELETE|lectures|enrollments|payment_orders/i.test(c.sql)),false);
 });
 test("Published course and classroom read the stored order for students",async()=>{
