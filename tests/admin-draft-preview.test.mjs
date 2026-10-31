@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {onRequestGet as courseDetails} from "../functions/api/courses/[courseId].js";
 
 const base="https://infrarivet.pages.dev",cookie="a".repeat(64);
-function context({published=false,signedIn=true,role="owner",active=1,permissions=[],folder=false,exists=true}={}){
+function context({published=false,signedIn=true,role="owner",active=1,permissions=[],folder=false,exists=true,enrolled=false}={}){
  const root=exists?{id:"devops",title:"Devops",description:"Master course",published:published?1:0,
    status:"available",price:999,details_json:folder?'{"folderOnly":true}':'{"level":"Beginner"}'}:null;
  const sqls=[];
@@ -17,6 +17,7 @@ function context({published=false,signedIn=true,role="owner",active=1,permission
      async first(){
       if(sql.includes("FROM courses WHERE id=?"))return root;
       if(sql.includes("FROM sessions s JOIN users u"))return {id:"admin-1",email:"admin@example.com",role,staffActive:active,permissionsJson:JSON.stringify(permissions)};
+      if(sql.includes("FROM enrollments e"))return {direct:enrolled?1:0,bundled:0};
       return null;
      },
      async all(){
@@ -37,6 +38,7 @@ test("An authenticated owner can preview DevOps draft and included syllabus with
  const data=await response.json();
  assert.equal(data.course.title,"Devops");
  assert.equal(data.course.published,false);
+ assert.equal(data.previewOnly,false);
  assert.deepEqual(data.modules.map(m=>m.title),["Devops","Python with Linux"]);
  assert.equal(ctx.sqls.some(s=>s.includes("FROM lectures")),true);
 });
@@ -62,6 +64,8 @@ test("Published standalone courses remain accessible to anonymous visitors",asyn
  assert.match(response.headers.get("Cache-Control"),/public, max-age=60/);
  const data=await response.json();
  assert.equal(data.course.published,true);
+ assert.equal(data.previewOnly,true);
+ assert.deepEqual(data.modules.map(m=>m.lessons),[[],[]]);
 });
 test("Private folders cannot be visited directly as course pages, even by an owner",async()=>{
  const response=await courseDetails(context({folder:true}));
@@ -70,4 +74,28 @@ test("Private folders cannot be visited directly as course pages, even by an own
 test("Unknown draft IDs remain hidden",async()=>{
  const response=await courseDetails(context({exists:false}));
  assert.equal(response.status,404);
+});
+
+test("Signed-in non-buyers cannot retrieve lesson titles, IDs, counts or trial flags from published course API",async()=>{
+ const ctx=context({published:true,role:null,active:0});
+ const response=await courseDetails(ctx);
+ assert.equal(response.status,200);
+ assert.equal(response.headers.get("Cache-Control"),"private, no-store");
+ const json=await response.json(),body=JSON.stringify(json);
+ assert.equal(json.previewOnly,true);
+ assert.deepEqual(json.modules.map(m=>m.title),["Devops","Python with Linux"]);
+ for(const hidden of ["First lesson","-lesson","trialEnabled","freePreview","chapter"])assert.equal(body.includes(hidden),false,hidden);
+ assert.equal(ctx.sqls.some(s=>s.includes("FROM lectures")),false);
+});
+test("Active direct or bundle enrollment restores the full lesson catalog",async()=>{
+ for(const options of [{published:true,role:null,active:0,enrolled:true},{published:true,role:"owner",active:1}]){
+  const ctx=context(options);
+  const response=await courseDetails(ctx);
+  assert.equal(response.status,200);
+  const json=await response.json();
+  assert.equal(json.previewOnly,false);
+  assert.equal(json.modules[0].lessons[0].title,"First lesson");
+  assert.equal(json.modules[1].lessons[0].title,"First lesson");
+  assert.equal(ctx.sqls.some(s=>s.includes("FROM lectures")),true);
+ }
 });
