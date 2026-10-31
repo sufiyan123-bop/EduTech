@@ -73,7 +73,8 @@ test("Published course and classroom read the stored order for students",async()
  const publicData=await courseResponse.json();
  assert.equal(publicData.previewOnly,true);
  assert.deepEqual(publicData.modules.map(x=>x.title),["DevOps","Linux Deep dive","Python with Linux","Docker"]);
- const classroomResponse=await classroom({env:data.env,params:{courseId:"devops"},request:new Request(origin+"/api/learn/devops",{headers:{Cookie:"infrarivet_session="+cookie}})});
+ const learnerEnv={DB:{prepare(sql){if(sql.includes("FROM sessions s JOIN users u"))return {bind:()=>({first:async()=>({id:"student",role:null,staffActive:0})})};return data.env.DB.prepare(sql)}}};
+ const classroomResponse=await classroom({env:learnerEnv,params:{courseId:"devops"},request:new Request(origin+"/api/learn/devops",{headers:{Cookie:"infrarivet_session="+cookie}})});
  assert.equal(classroomResponse.status,200);
  const room=await classroomResponse.json();
  assert.equal(room.previewOnly,true);
