@@ -87,3 +87,34 @@ export async function onRequestDelete(ctx){
   return json({removed:true,id:folderId});
  }catch(e){return errorResponse(e)}
 }
+
+/**
+ * Reorder both private folders and included standalone courses within one
+ * master. IDs must be an exact permutation of existing children, so an admin
+ * cannot insert, detach or move content into another master via this endpoint.
+ */
+export async function onRequestPut(ctx){
+ try{
+  checkOrigin(ctx.request);
+  const admin=await requireUser(ctx);requireStaff(admin,"courses.manage");
+  const body=await bodyJson(ctx.request);
+  const parentId=idOf(body.parentCourseId),ordered=body.orderedChildIds;
+  if(!Array.isArray(ordered)||ordered.length>100||ordered.some(x=>typeof x!=="string"||!x.trim()||x.length>160))
+   fail(400,"Send an ordered list of included course IDs");
+  const ids=ordered.map(idOf);
+  if(new Set(ids).size!==ids.length)fail(400,"Folder IDs cannot repeat");
+  const db=ctx.env.DB;
+  await parentCourse(db,parentId);
+  const current=await db.prepare(`SELECT child_course_id AS childId FROM course_inclusions
+    WHERE parent_course_id=? ORDER BY sort_order,child_course_id`).bind(parentId).all();
+  const currentIds=(current.results||[]).map(row=>row.childId);
+  if(ids.length!==currentIds.length||ids.some(id=>!currentIds.includes(id)))
+   fail(409,"Folder list changed. Reload and try again.");
+  if(ids.length){
+   await db.batch(ids.map((id,index)=>db.prepare(`UPDATE course_inclusions
+      SET sort_order=? WHERE parent_course_id=? AND child_course_id=?`)
+     .bind(index,parentId,id)));
+  }
+  return json({saved:true,parentCourseId:parentId,orderedChildIds:ids});
+ }catch(e){return errorResponse(e)}
+}
