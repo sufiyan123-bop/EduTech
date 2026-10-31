@@ -98,6 +98,7 @@ function masterCtx(included,{shared=[{childId:"python",privateFolder:0}],admin=t
  const DB={prepare(sql){
   queries.push(sql);
   return {
+   async all(){return sql.includes("SELECT id FROM courses")?{results:[{id:"devops"},{id:"python"},{id:"linux"},{id:"folder"}]}:{results:[]};},
    bind(...values){return {
     async first(){
      if(sql.includes("FROM sessions s JOIN users u"))
