@@ -109,6 +109,7 @@ function mockState({role="owner",active=1,perms=["lectures.manage"],existing=[],
   return statement();
  },async batch(list){for(const st of list)await st.run();return []}};
  const bucket={
+  async list(){return {objects:[...r2Objects.values()].map(o=>({size:o.size})),truncated:false}},
   async createMultipartUpload(key){
    const u={id:"upload-"+r2Uploads.size,key,parts:[]};r2Uploads.set(u.id,u);
    return {uploadId:u.id};
