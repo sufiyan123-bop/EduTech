@@ -12,6 +12,7 @@ function mockEnv(){
    id:"owner-1",email:"admin@example.com",role:"owner",staffActive:1,permissionsJson:"[]"
   })}}}}},
   VIDEOS:{
+   list:async()=>({objects:[...files.values()].map(f=>({size:f.body.byteLength})),truncated:false}),
    put:async (key,bytes,options)=>{files.set(key,{body:bytes,httpMetadata:options.httpMetadata});},
    get:async key=>files.get(key)||null
   }
