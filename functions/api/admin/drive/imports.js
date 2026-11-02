@@ -1,3 +1,4 @@
+import {requireR2Capacity} from "../../../_lib/r2-quota.js";
 import {requireUser,requireStaff,checkOrigin,bodyJson,json,fail,errorResponse} from "../../../_lib/core.js";
 import {folderIdFrom,driveToken,listDriveVideos,cleanImportTitle,cleanChapter,MAX_ITEMS} from "../../../_lib/drive-import.js";
 
@@ -60,6 +61,8 @@ export async function onRequestPost(ctx){
    titles.add(title.toLowerCase());
    plan.push({file,title,chapter:cleanChapter(req.chapter)});
   }
+  // Fail before creating import jobs that cannot fit inside the 9GB R2 budget.
+  await requireR2Capacity(ctx.env.VIDEOS,plan.reduce((sum,p)=>sum+p.file.size,0));
   const last=await ctx.env.DB.prepare("SELECT COALESCE(MAX(sort_order),0) AS lastOrder FROM lectures WHERE course_id=?").bind(courseId).first();
   const jobId=crypto.randomUUID(),start=Number(last?.lastOrder||0);
   // Only a manifest is saved now. No Google Drive file is mutated and NO R2

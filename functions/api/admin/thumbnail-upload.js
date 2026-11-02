@@ -1,3 +1,4 @@
+import {requireR2Capacity} from "../../_lib/r2-quota.js";
 import {requireUser,requireStaff,checkOrigin,fail,json,errorResponse} from "../../_lib/core.js";
 export const MAX_THUMBNAIL_BYTES=3*1024*1024;
 export function validImageBytes(bytes,type){
@@ -19,6 +20,7 @@ export async function onRequestPut(ctx){
   const bytes=new Uint8Array(buffer);
   if(!bytes.length||bytes.length>MAX_THUMBNAIL_BYTES)fail(413,"Thumbnail must be smaller than 3 MB");
   if(!validImageBytes(bytes,type))fail(415,"The uploaded file is not a valid JPG, PNG or WebP image");
+  await requireR2Capacity(ctx.env.VIDEOS,bytes.byteLength);
   const id=crypto.randomUUID();
   await ctx.env.VIDEOS.put("thumbnails/"+id,buffer,{httpMetadata:{contentType:type}});
   return json({url:new URL("/api/thumbnails/"+id,ctx.request.url).toString()});

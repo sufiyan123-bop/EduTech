@@ -14,8 +14,11 @@ export default function DriveImporter({courseId,courses,onImported}){
  const [jobs,setJobs]=useState([]),[busy,setBusy]=useState(false),[running,setRunning]=useState(false);
  const [error,setError]=useState(""),[message,setMessage]=useState(""),[progress,setProgress]=useState("");
  const [confirmed,setConfirmed]=useState(false);
+ const [storage,setStorage]=useState(null);
  const [bulkTitles,setBulkTitles]=useState("");
  const destination=courses.find(c=>c.id===courseId);
+ const loadStorage=useCallback(async()=>{const result=await api("/api/admin/storage");setStorage(result.storage)},[]);
+ useEffect(()=>{loadStorage().catch(()=>{setStorage(null)})},[loadStorage,courseId]);
 
  const loadJobs=useCallback(async()=>{
   if(!courseId)return;
@@ -142,7 +145,7 @@ export default function DriveImporter({courseId,courses,onImported}){
     if(pauseRef.current)break;
    }
    if(pauseRef.current)setMessage("Import paused. Reconnect Drive and Resume when ready.");
-   else{setMessage("Import completed. Check your destination folder for the new lectures.");onImported?.()}
+   else{setMessage("Import completed. Check your destination folder for the new lectures.");onImported?.();await loadStorage()}
   }catch(e){setError(e.message+" — fix the connection and press Resume. Existing lessons are safe.");await loadJobs()}
   finally{runningRef.current=false;setRunning(false)}
  }
@@ -164,6 +167,7 @@ export default function DriveImporter({courseId,courses,onImported}){
     <p className="mt-1 text-sm leading-6 text-slate-600">Destination: <strong>{destination.title}</strong>. Connect Drive read-only, preview a folder, edit video titles, then prepare and explicitly start the private R2 transfer. Existing lessons and Drive files are never changed.</p>
    </div>
   </div>
+  {storage&&<div role="status" className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><strong>R2 storage: {(storage.usedBytes/1e9).toFixed(2)} GB / 9.00 GB</strong><span className="ml-2">· {(storage.remainingBytes/1e9).toFixed(2)} GB available</span><p className="mt-1 text-xs">Uploads stop at 9 GB to preserve a 300 MB margin below the 9.3 GB absolute maximum. This includes videos and thumbnails.</p></div>}
   <div className="mt-4 flex flex-wrap items-center gap-3">
    <button type="button" disabled={!oauthReady||busy||running} onClick={connect} className="inline-flex items-center gap-2 rounded-xl border border-sky-300 bg-white px-4 py-2.5 text-sm font-bold text-sky-800 disabled:opacity-50">
     <ShieldCheck size={17}/>{connected?"Reconnect Google Drive":"Connect Google Drive"}

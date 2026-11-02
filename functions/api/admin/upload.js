@@ -1,3 +1,4 @@
+import {requireR2Capacity} from "../../_lib/r2-quota.js";
 import {requireUser,requireStaff,checkOrigin,fail,json,errorResponse} from "../../_lib/core.js";
 export async function onRequestPut(ctx){
  try{
@@ -10,6 +11,8 @@ export async function onRequestPut(ctx){
   if(!["video/mp4","video/webm"].includes(type))fail(415,"Only MP4 or WebM videos are supported");
   const length=Number(ctx.request.headers.get("Content-Length")||0);
   if(!length||length>90*1024*1024)fail(413,"Video must be smaller than 90 MB");
+  // Deny before reading the request stream when it would exceed 9 GB.
+  await requireR2Capacity(ctx.env.VIDEOS,length);
   const extension=type==="video/webm"?"webm":"mp4";
   const key="lessons/"+courseId+"/"+crypto.randomUUID()+"."+extension;
   await ctx.env.VIDEOS.put(key,ctx.request.body,{httpMetadata:{contentType:type}});
