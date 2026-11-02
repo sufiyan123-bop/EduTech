@@ -243,6 +243,6 @@ test("Importer UI requires explicit Start or Resume and does not auto-upload",()
  const ui=readFileSync(new URL("../src/cloudflare/DriveImporter.jsx",import.meta.url),"utf8");
  assert.match(ui,/Prepare selected videos/);
  assert.match(ui,/Start \/ Resume import/);
- assert.match(ui,/import\s*\(/); // explicit JSX component lives in admin
+ assert.match(ui,/function DriveImporter/);
  assert.match(ui,/requestAccessToken/);
 });
