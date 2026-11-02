@@ -286,3 +286,34 @@ test("Importer UI requires explicit Start or Resume and does not auto-upload",()
  assert.match(ui,/function DriveImporter/);
  assert.match(ui,/requestAccessToken/);
 });
+
+test("Drive import plan rejects videos that would exceed 9GB before creating jobs or lectures",async()=>{
+ const undo=await restoreFetch(googleMock);
+ try{
+  const s=mockState();
+  s.env.VIDEOS.list=async()=>({objects:[{size:8_999_999_999}],truncated:false});
+  const r=await planImport(request(s,"/api/admin/drive/imports",{
+   courseId:"docker",folderUrl:folderId,confirm:true,
+   files:[{fileId,title:"Docker lesson"}]
+  }));
+  assert.equal(r.status,413);
+  assert.equal(s.items.size,0);assert.equal(s.jobs.size,0);
+  assert.equal(s.r2Objects.size,0);assert.equal(s.lectures.length,0);
+ }finally{undo()}
+});
+test("Prepared Drive import cannot start if R2 has filled since preparation",async()=>{
+ const undo=await restoreFetch(googleMock);
+ try{
+  const s=mockState();
+  const prepared=await planImport(request(s,"/api/admin/drive/imports",{
+   courseId:"docker",folderUrl:folderId,confirm:true,
+   files:[{fileId,title:"Docker lesson"}]
+  }));
+  assert.equal(prepared.status,201);
+  s.env.VIDEOS.list=async()=>({objects:[{size:8_999_999_999}],truncated:false});
+  const response=await importStep(request(s,"/api/admin/drive/step",{itemId:[...s.items.keys()][0]}));
+  assert.equal(response.status,413);
+  assert.equal([...s.items.values()][0].state,"pending");
+  assert.equal(s.r2Objects.size,0);assert.equal(s.lectures.length,0);
+ }finally{undo()}
+});
