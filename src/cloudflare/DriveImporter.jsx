@@ -14,6 +14,7 @@ export default function DriveImporter({courseId,courses,onImported}){
  const [jobs,setJobs]=useState([]),[busy,setBusy]=useState(false),[running,setRunning]=useState(false);
  const [error,setError]=useState(""),[message,setMessage]=useState(""),[progress,setProgress]=useState("");
  const [confirmed,setConfirmed]=useState(false);
+ const [bulkTitles,setBulkTitles]=useState("");
  const destination=courses.find(c=>c.id===courseId);
 
  const loadJobs=useCallback(async()=>{
@@ -54,6 +55,30 @@ export default function DriveImporter({courseId,courses,onImported}){
   })();
   return()=>{alive=false;script?.remove()};
  },[]);
+ function applyBulkTitles(){
+  const lines=bulkTitles.split(/\r?\n/).map(t=>t.trim()).filter(Boolean);
+  if(!lines.length){setError("Paste one or more lecture titles first.");return}
+  const numbered=new Map();
+  for(const line of lines){
+   const match=line.match(/#\s*(\d+)/);
+   if(match)numbered.set(Number(match[1]),line);
+  }
+  const selected=files.filter(f=>f.selected),allNumbered=numbered.size===lines.length;
+  if(!allNumbered&&selected.length!==lines.length){
+   setError("Paste exactly "+selected.length+" titles, or use '#39' format to match lecture numbers.");
+   return;
+  }
+  let cursor=0,matches=0;
+  const updated=files.map(f=>{
+   if(!f.selected)return f;
+   const n=f.name.match(/(?:lecture|tutorial|lesson|part)\s*#?\s*(\d+)/i)?.[1];
+   const title=allNumbered&&n?numbered.get(Number(n)):(allNumbered?null:lines[cursor++]);
+   if(!title)return f;
+   matches++;return {...f,title:title.slice(0,220)};
+  });
+  if(!matches){setError("No matching video numbers found. Check names or paste titles in selected-video order.");return}
+  setFiles(updated);setError("");setMessage("Applied "+matches+" lecture titles. Review them before preparing.");
+ }
  function accessToken(){
   if(!tokenRef.current||Date.now()>=expiryRef.current){
    setConnected(false);
@@ -168,6 +193,13 @@ export default function DriveImporter({courseId,courses,onImported}){
        </div>
       </div></div>
     </div>)}
+   </div>
+   <div className="mt-4 rounded-xl bg-sky-50 p-3">
+    <label className="block text-xs font-bold text-slate-800">Bulk lecture titles (optional)</label>
+    <p className="mt-1 text-xs text-slate-600">Paste one title per line. Titles with #39, #40 etc. automatically match video numbers; otherwise titles map to selected videos in displayed order.</p>
+    <textarea rows={4} value={bulkTitles} onChange={e=>setBulkTitles(e.target.value)}
+     placeholder="Python Tutorial in Hindi #39 | Reading Files…" className={field+" mt-2"} aria-label="Bulk lecture titles"/>
+    <button type="button" onClick={applyBulkTitles} disabled={busy||running} className="mt-2 rounded-lg border border-sky-300 bg-white px-3 py-2 text-xs font-bold text-sky-800">Apply pasted titles</button>
    </div>
    <label className="mt-4 flex items-start gap-2 text-sm text-slate-700"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)} className="mt-1"/> I checked the destination, titles, order and selected videos. Prepare an import job only; do not upload yet.</label>
    <button type="button" disabled={busy||running||!confirmed||!files.some(f=>f.selected)} onClick={prepare} className="mt-3 rounded-xl bg-blue-700 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">Prepare selected videos ({files.filter(f=>f.selected).length})</button>
