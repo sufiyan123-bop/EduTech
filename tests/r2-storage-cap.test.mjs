@@ -16,16 +16,22 @@ function storageBucket(used=originalR2){
  };
 }
 function context(bucket,method,path,{body=new Uint8Array([1,2,3,4]),type="video/mp4",signedIn=true}={}){
- return {env:{VIDEOS:bucket,DB:{prepare(sql){
-  return {bind(...args){return {async first(){
-   if(sql.includes("FROM sessions s JOIN users u"))return {id:"owner",role:"owner",staffActive:1,permissionsJson:"[]"};
-   if(sql.includes("SELECT id FROM courses"))return {id:"docker"};
-   return null;
-  }}};
- }};}},request:new Request(origin+path,{method,headers:{
-  Origin:origin,"Content-Type":type,"Content-Length":String(body.byteLength),"X-Course-Id":"docker",
-  ...(signedIn?{Cookie:"infrarivet_session="+cookie}:{})
- },...(method!=="GET"?{body}: {})})};
+ const DB={
+  prepare(sql){
+   return {bind(){
+    return {async first(){
+     if(sql.includes("FROM sessions s JOIN users u"))
+      return {id:"owner",role:"owner",staffActive:1,permissionsJson:"[]"};
+     if(sql.includes("SELECT id FROM courses"))return {id:"docker"};
+     return null;
+    }};
+   }};
+  }
+ };
+ const headers={Origin:origin,"Content-Type":type,"Content-Length":String(body.byteLength),
+  "X-Course-Id":"docker",...(signedIn?{Cookie:"infrarivet_session="+cookie}:{})};
+ return {env:{VIDEOS:bucket,DB},
+  request:new Request(origin+path,{method,headers,...(method!=="GET"?{body}:{})})};
 }
 test("Quota is decimal 9GB with a strict 300MB buffer below 9.3GB",()=>{
  assert.equal(R2_UPLOAD_TARGET_BYTES,9_000_000_000);
