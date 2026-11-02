@@ -1,3 +1,4 @@
+import {requireR2Capacity} from "../../../_lib/r2-quota.js";
 import {requireUser,requireStaff,checkOrigin,bodyJson,json,fail,errorResponse} from "../../../_lib/core.js";
 import {driveToken,driveFile,downloadRange,PART_SIZE} from "../../../_lib/drive-import.js";
 
@@ -48,6 +49,8 @@ export async function onRequestPost(ctx){
    if(!source.parents?.includes(item.folderId)||source.trashed||source.mimeType!==item.mime_type||
     Number(source.size)!==Number(item.size_bytes))
     fail(409,"Drive video changed or moved. Cancel this job and prepare it again.");
+   // Confirm storage headroom before allocating multipart upload state.
+   await requireR2Capacity(bucket,Number(item.size_bytes));
    // An object is only made visible as a lesson after multipart completion.
    const upload=await bucket.createMultipartUpload(item.r2_key,{httpMetadata:{contentType:item.mime_type}});
    await db.prepare(`UPDATE drive_import_items SET state='uploading',upload_id=?,last_error=NULL
@@ -83,6 +86,8 @@ export async function onRequestPost(ctx){
   if(item.state==="finalizing"){
    let object=await bucket.head(item.r2_key);
    if(!object){
+    // Check again before completing. Other admins might have uploaded in the meantime.
+    await requireR2Capacity(bucket,Number(item.size_bytes));
     const parts=JSON.parse(item.parts_json||"[]");
     if(parts.length!==partsTotal||parts.some((p,i)=>p.partNumber!==i+1||!p.etag))
      fail(409,"Import parts are incomplete. Resume the upload.");
