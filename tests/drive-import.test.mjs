@@ -220,6 +220,45 @@ test("8MiB chunk upload resumes from pending and creates a paid private lecture 
   assert.equal(s.lectures.length,1);
  }finally{undo()}
 });
+test("A video over 8 MiB is assembled in multiple R2 parts before its lecture is added",async()=>{
+ const length=PART_SIZE+12345;
+ const largeGoogle=(url,opts)=>{
+  const u=new URL(url);
+  if(u.pathname==="/drive/v3/files/"+fileId&&u.searchParams.get("alt")==="media"){
+   const range=opts.headers.Range.match(/^bytes=(\d+)-(\d+)$/);
+   const start=Number(range[1]),end=Number(range[2]);
+   return new Response(new Uint8Array(end-start+1),{
+    status:206,headers:{"Content-Range":`bytes ${start}-${end}/${length}`}
+   });
+  }
+  if(u.pathname==="/drive/v3/files/"+fileId)
+   return Response.json({id:fileId,name:"Lecture 39.mp4",size:String(length),parents:[folderId],
+    mimeType:"video/mp4",trashed:false});
+  if(u.pathname==="/drive/v3/files"&&u.searchParams.has("q"))
+   return Response.json({files:[{id:fileId,name:"Lecture 39.mp4",size:String(length),mimeType:"video/mp4"}]});
+  return googleMock(url,opts);
+ };
+ const undo=await restoreFetch(largeGoogle);
+ try{
+  const s=mockState();
+  const plan=await planImport(request(s,"/api/admin/drive/imports",{
+   courseId:"docker",folderUrl:folderId,confirm:true,files:[{fileId,title:"Python Lesson 39"}]
+  }));
+  assert.equal(plan.status,201);
+  const id=[...s.items.keys()][0],body={itemId:id};
+  assert.equal((await importStep(request(s,"/api/admin/drive/step",body))).status,200);
+  const chunk1=await importStep(request(s,"/api/admin/drive/step",body));
+  assert.equal((await chunk1.json()).partsUploaded,1);
+  assert.equal(s.lectures.length,0);
+  const chunk2=await importStep(request(s,"/api/admin/drive/step",body));
+  assert.equal((await chunk2.json()).state,"finalizing");
+  assert.equal(s.lectures.length,0);
+  const final=await importStep(request(s,"/api/admin/drive/step",body));
+  assert.equal((await final.json()).state,"completed");
+  assert.equal([...s.r2Objects.values()][0].size,length);
+  assert.equal(s.lectures.length,1);
+ }finally{undo()}
+});
 test("A failed Drive chunk never attaches a lecture or exposes videos",async()=>{
  const undo=await restoreFetch((url,opts)=>{
   const u=new URL(url);
